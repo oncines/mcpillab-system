@@ -109,14 +109,29 @@ function register_user($username, $email, $password, $full_name, $role = 'employ
 function generate_employee_id() {
     $database = new Database();
     $db = $database->getConnection();
-    
-    $query = "SELECT COUNT(*) as count FROM employees WHERE YEAR(hire_date) = YEAR(CURDATE())";
-    $stmt = $db->prepare($query);
-    $stmt->execute();
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    $count = $result['count'] + 1;
-    return 'EMP' . date('Y') . str_pad($count, 3, '0', STR_PAD_LEFT);
+
+    // A row can be deleted or an ID can be entered manually, so a row count
+    // is not a safe way to calculate the next employee number.  Start after
+    // the highest ID for this year and confirm that the candidate is unused.
+    $prefix = 'EMP' . date('Y');
+    $stmt = $db->prepare("SELECT employee_id FROM employees WHERE employee_id LIKE :prefix ORDER BY employee_id DESC");
+    $stmt->execute([':prefix' => $prefix . '%']);
+
+    $highest = 0;
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $employee_id) {
+        if (preg_match('/^' . preg_quote($prefix, '/') . '(\\d+)$/', $employee_id, $matches)) {
+            $highest = max($highest, (int) $matches[1]);
+        }
+    }
+
+    do {
+        $highest++;
+        $candidate = $prefix . str_pad($highest, 3, '0', STR_PAD_LEFT);
+        $check = $db->prepare("SELECT 1 FROM employees WHERE employee_id = :employee_id LIMIT 1");
+        $check->execute([':employee_id' => $candidate]);
+    } while ($check->fetchColumn());
+
+    return $candidate;
 }
 
 // Purchase Order Functions

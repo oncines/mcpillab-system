@@ -427,6 +427,7 @@ $avg_check_out = !empty($check_out_times) ? date('g:i A', (int)(array_sum($check
             .summary-card { padding: 16px; gap: 14px; }
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
 <div class="container-fluid p-0">

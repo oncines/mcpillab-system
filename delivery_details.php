@@ -389,6 +389,7 @@ $has_delay = !empty($delivery['delay']);
             .dp-time-grid { grid-template-columns: 1fr; }
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
 <div class="container-fluid">

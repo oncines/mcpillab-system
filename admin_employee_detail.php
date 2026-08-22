@@ -443,6 +443,7 @@ $unread_messages = get_unread_message_count($_SESSION['user_id']);
             }
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
     <div class="container-fluid">

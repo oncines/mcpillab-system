@@ -186,6 +186,7 @@ $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
             opacity: 0.5;
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
     <div class="container-fluid">

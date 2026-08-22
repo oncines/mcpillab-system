@@ -1,10 +1,12 @@
 <?php
 require_once 'config.php';
 
-require_roles(['admin', 'store']);
+require_roles(['admin', 'store', 'employee']);
 
 // ── POST handlers ──────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_po'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_employee()) {
+    $error_message = 'Employees have view-only access to purchase orders.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_po'])) {
     if (empty($_POST['po_number']) || empty($_POST['supplier_id']) || empty($_POST['order_date'])) {
         $error_message = "Please fill in all required fields.";
     } else {
@@ -65,7 +67,7 @@ $page   = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $limit  = 10;
 $offset = ($page - 1) * $limit;
 
-if ($_SESSION['user_role'] === 'admin') {
+if ($_SESSION['user_role'] === 'admin' || is_employee()) {
     $status_filter   = isset($_GET['status']) ? $_GET['status'] : null;
     $purchase_orders = get_purchase_orders_admin($limit, $offset, $status_filter);
 } else {
@@ -76,6 +78,7 @@ $suppliers       = get_suppliers();
 $unread_messages = get_unread_message_count($_SESSION['user_id']);
 $is_store        = ($_SESSION['user_role'] === 'store');
 $is_admin        = ($_SESSION['user_role'] === 'admin');
+$is_employee     = is_employee();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -579,6 +582,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--gray-50); margin: 0
     .product-grid { grid-template-columns: repeat(2,1fr); }
 }
 </style>
+<link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
 <div class="toast-wrap" id="toastWrap"></div>
@@ -609,9 +613,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--gray-50); margin: 0
         <a class="sidebar-link" href="purchase_invoice.php"><span class="icon"><i class="fas fa-file-invoice"></i></span><span class="link-label">Purchase Invoice</span></a>
         <?php endif; ?>
 
+        <?php if (!is_store()): ?>
         <div class="nav-section-label">Logistics</div>
         <a class="sidebar-link" href="delivery_tracking.php"><span class="icon"><i class="fas fa-truck"></i></span><span class="link-label">Delivery Tracking</span></a>
         <a class="sidebar-link" href="delivery_history.php"><span class="icon"><i class="fas fa-history"></i></span><span class="link-label">Delivery History</span></a>
+        <?php endif; ?>
 
         <div class="nav-section-label">Tools</div>
         <a class="sidebar-link" href="reports.php"><span class="icon"><i class="fas fa-chart-bar"></i></span><span class="link-label">Reports</span></a>

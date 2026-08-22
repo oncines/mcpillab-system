@@ -424,6 +424,7 @@ function avatar_color($id) {
         @media (max-width: 768px) { .app-body { grid-template-columns: 1fr; } .msg-list-pane { display: none; } }
         @media (max-width: 991.98px) { .main-wrap { margin-left: 0; width: 100vw; } }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
 
@@ -469,10 +470,12 @@ function avatar_color($id) {
         <a class="sb-item" href="attendance_history.php"><i class="ti ti-history"></i>Attendance History</a>
         <?php endif; ?>
 
+        <?php if (!is_store()): ?>
         <div class="sb-section">Logistics</div>
         <a class="sb-item" href="delivery_tracking.php"><i class="ti ti-truck-delivery"></i>Delivery Tracking</a>
         <?php if (!is_employee()): ?>
         <a class="sb-item" href="delivery_history.php"><i class="ti ti-history"></i>Delivery History</a>
+        <?php endif; ?>
         <?php endif; ?>
 
         <div class="sb-section">Tools</div>

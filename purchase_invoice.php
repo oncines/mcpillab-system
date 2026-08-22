@@ -1,6 +1,6 @@
 <?php
 require_once 'config.php';
-require_roles(['admin', 'manager', 'store']);
+require_roles(['admin', 'manager', 'store', 'employee']);
 
 $unread_messages = get_unread_message_count($_SESSION['user_id']);
 
@@ -283,6 +283,7 @@ table.mtbl td:first-child{padding-left:24px}
   .kpi-grid{grid-template-columns:1fr 1fr}
 }
 </style>
+<link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
 
@@ -305,12 +306,14 @@ table.mtbl td:first-child{padding-left:24px}
     <a class="sb-item" href="<?php echo is_employee() ? 'employee_home.php' : 'dashboard.php'; ?>"><i class="ti ti-layout-dashboard"></i><?php echo is_employee() ? 'Home' : 'Dashboard'; ?></a>
     <a class="sb-item" href="purchase_order.php"><i class="ti ti-shopping-cart"></i>Purchase Order</a>
     <a class="sb-item active" href="purchase_invoice.php"><i class="ti ti-file-invoice"></i>Purchase Invoice</a>
+    <?php if (is_admin() || is_manager()): ?>
     <a class="sb-item" href="employee_profile.php"><i class="ti ti-users"></i>Employee Profile</a>
     <a class="sb-item" href="attendance.php"><i class="ti ti-calendar-check"></i>Attendance</a>
 
     <div class="sb-section">Logistics</div>
     <a class="sb-item" href="delivery_tracking.php"><i class="ti ti-truck-delivery"></i>Delivery Tracking</a>
     <a class="sb-item" href="delivery_history.php"><i class="ti ti-history"></i>Delivery History</a>
+    <?php endif; ?>
 
     <div class="sb-section">Tools</div>
     <a class="sb-item" href="reports.php"><i class="ti ti-chart-bar"></i>Reports</a>

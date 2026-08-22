@@ -336,7 +336,8 @@ $suppliers = $can_manage_inventory ? get_suppliers() : [];
                 border: 1px solid #ddd !important;
             }
         }
-    </style>
+        </style>
+        <link rel="stylesheet" href="sidebar-standard.css?v=2">
 </head>
 <body>
     <div class="container-fluid">

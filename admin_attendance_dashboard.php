@@ -397,6 +397,7 @@ $unread_messages = get_unread_message_count($_SESSION['user_id']);
             border-bottom: 3px solid #667eea;
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
     <div class="container-fluid">

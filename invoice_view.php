@@ -345,6 +345,7 @@ if (isset($_GET['print']) && $_GET['print'] == '1') {
             color: black;
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
     <div class="container-fluid">
@@ -388,6 +389,7 @@ if (isset($_GET['print']) && $_GET['print'] == '1') {
                                 <i class="fas fa-list"></i> Invoice List
                             </a>
                         </li>
+                        <?php if (!is_store()): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="employee_profile.php">
                                 <i class="fas fa-users"></i> Employee Profile
@@ -408,6 +410,7 @@ if (isset($_GET['print']) && $_GET['print'] == '1') {
                                 <i class="fas fa-history"></i> Delivery History
                             </a>
                         </li>
+                        <?php endif; ?>
                         <li class="nav-item">
                             <a class="nav-link" href="reports.php">
                                 <i class="fas fa-chart-bar"></i> Reports

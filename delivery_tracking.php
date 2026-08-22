@@ -1,6 +1,8 @@
 <?php
 require_once 'config.php';
 
+require_login();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     if (!is_admin() && !is_manager()) {
         $error_message = "You don't have permission to update delivery status.";
@@ -756,6 +758,7 @@ table.mtbl tbody tr.row-active { background: var(--navy-pale); }
 .alert-success { background: var(--green-bg); color: var(--green); border: 1px solid #a7f3d0; }
 .alert-danger  { background: var(--red-tint); color: var(--red);   border: 1px solid #fecaca; }
 </style>
+<link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
 
@@ -820,6 +823,7 @@ table.mtbl tbody tr.row-active { background: var(--navy-pale); }
     <?php endif; ?>
 
     <!-- LOGISTICS -->
+    <?php if (!is_store()): ?>
     <div class="sb-section">Logistics</div>
 
     <a class="sb-item sb-highlight active" href="delivery_tracking.php">
@@ -832,6 +836,7 @@ table.mtbl tbody tr.row-active { background: var(--navy-pale); }
       <i class="ti ti-history"></i>
       Delivery History
     </a>
+    <?php endif; ?>
     <?php endif; ?>
 
     <!-- TOOLS -->

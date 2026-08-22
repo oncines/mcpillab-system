@@ -288,6 +288,7 @@ exit();
             transform: scale(1.05);
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
     <div class="container-fluid">

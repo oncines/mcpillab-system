@@ -330,6 +330,7 @@ exit();
             color: #dee2e6;
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
     <div class="container-fluid">

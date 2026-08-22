@@ -125,7 +125,10 @@ function get_role_home($role = null) {
 
     switch ($role) {
         case 'employee':
-            return 'employee_home.php';
+            // Employees use the same logistics dashboard as the other roles.
+            // It is view-only for operational records, so everyone sees the
+            // same delivery, PO, and invoice lists.
+            return 'dashboard.php';
         case 'admin':
         case 'manager':
         case 'store':
@@ -289,7 +292,5 @@ if (in_array($current_page, $protected_pages) && !is_logged_in()) {
     redirect('index.php');
 }
 
-if ($current_page === 'dashboard.php' && is_employee()) {
-    redirect(get_role_home('employee'));
-}
+// Employees are allowed to use dashboard.php as their shared list dashboard.
 ?>

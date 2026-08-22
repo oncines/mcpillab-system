@@ -335,6 +335,7 @@ $unread_messages = get_unread_message_count($_SESSION['user_id']);
             .content-card { padding: 16px; }
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
 
@@ -380,10 +381,12 @@ $unread_messages = get_unread_message_count($_SESSION['user_id']);
         <a class="sb-item" href="attendance_history.php"><i class="ti ti-history"></i>Attendance History</a>
         <?php endif; ?>
 
+        <?php if (!is_store()): ?>
         <div class="sb-section">Logistics</div>
         <a class="sb-item" href="delivery_tracking.php"><i class="ti ti-truck-delivery"></i>Delivery Tracking</a>
         <?php if (!is_employee()): ?>
         <a class="sb-item" href="delivery_history.php"><i class="ti ti-history"></i>Delivery History</a>
+        <?php endif; ?>
         <?php endif; ?>
 
         <div class="sb-section">Tools</div>

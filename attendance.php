@@ -409,6 +409,7 @@ table.mtbl td:first-child { padding-left:24px; }
 .alert-success { background:var(--green-bg); color:var(--green); border:1px solid #a7f3d0; }
 .alert-danger  { background:var(--red-tint); color:var(--red); border:1px solid #fecaca; }
 </style>
+<link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
 

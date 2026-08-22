@@ -3,6 +3,10 @@ require_once 'config.php';
 
 require_roles(['employee']);
 
+// The shared dashboard is the employee landing page.  Keeping this redirect
+// also preserves existing bookmarks to employee_home.php.
+redirect('dashboard.php');
+
 $stats = get_dashboard_stats();
 $unread_messages = get_unread_message_count($_SESSION['user_id']);
 $recent_deliveries = get_deliveries(null, 5);
@@ -848,7 +852,8 @@ $greeting = $greeting_hour < 12 ? 'morning' : ($greeting_hour < 18 ? 'afternoon'
             .delivery-row { align-items: flex-start; }
             .status-badge { margin-top: 7px; }
         }
-</style>
+        </style>
+        <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
 <nav id="appSidebar" class="sidebar">

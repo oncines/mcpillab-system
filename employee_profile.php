@@ -444,6 +444,7 @@ $inactive_count = $employee_stats['inactive'] ?? 4;
             .search-wrap { max-width: 100%; }
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
 

@@ -135,6 +135,7 @@ $suppliers = get_suppliers();
             border-bottom: 2px solid #667eea;
         }
     </style>
+    <link rel="stylesheet" href="sidebar-standard.css">
 </head>
 <body>
     <div class="container-fluid">

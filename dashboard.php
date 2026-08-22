@@ -1,9 +1,14 @@
 <?php
 require_once 'config.php';
 
+require_login();
+
 $stats = get_dashboard_stats();
 $recent_orders = get_purchase_orders(5);
 $recent_deliveries = get_deliveries(null, 5);
+$all_purchase_orders = get_purchase_orders(100);
+$all_deliveries = get_deliveries(null, 100);
+$all_invoices = get_purchase_invoices_admin(100);
 $unread_notifications = (is_admin() || is_manager()) ? get_unread_attendance_notifications(10) : [];
 $unread_messages = get_unread_message_count($_SESSION['user_id']);
 ?>
@@ -303,6 +308,27 @@ table.dt tbody tr:hover td { background: #fafbff; }
 .act-desc  { font-size: 10px; color: var(--text-3); margin-top: 1.5px; line-height: 1.4; }
 .act-time  { font-size: 9.5px; color: var(--text-4); margin-top: 2.5px; display: flex; align-items: center; gap: 4px; }
 
+/* Shared logistics dashboard */
+.content > .kpi-grid, .content > .row-a, .content > .row-b, .content > .row-c, .content > .dm-overlay { display:none; }
+.list-dashboard { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; align-items:start; }
+.list-dashboard-head { grid-column:1/-1; display:flex; justify-content:space-between; align-items:flex-end; margin:2px 0 2px; }
+.list-dashboard-title { font-size:20px; font-weight:800; letter-spacing:-.035em; }
+.list-dashboard-sub { color:var(--text-3); font-size:11px; margin-top:3px; }
+.list-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; box-shadow:var(--sh); }
+.list-card-head { padding:14px 15px 12px; display:flex; align-items:center; gap:9px; border-bottom:1px solid var(--border); }
+.list-card-icon { width:30px; height:30px; border-radius:8px; display:grid; place-items:center; background:var(--blue-bg); color:var(--blue); }
+.list-card h2 { font-size:13px; font-weight:750; margin:0; }
+.list-card-count { margin-left:auto; font-size:10px; font-weight:700; color:var(--text-3); background:var(--bg); padding:3px 7px; border-radius:999px; }
+.list-table-wrap { max-height:510px; overflow:auto; }
+.list-table { width:100%; border-collapse:collapse; }
+.list-table th { position:sticky; top:0; z-index:1; background:var(--bg); color:var(--text-3); font-size:9px; text-transform:uppercase; letter-spacing:.07em; text-align:left; padding:8px 12px; }
+.list-table td { padding:10px 12px; border-top:1px solid var(--border); font-size:11px; color:var(--text-2); vertical-align:middle; }
+.list-table tr:hover td { background:#fafbff; }
+.list-table .ref { font-family:var(--mono); font-size:10px; font-weight:700; color:var(--blue); white-space:nowrap; }
+.list-table .name { font-weight:650; color:var(--text-1); max-width:135px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.list-card-foot { display:block; padding:10px 14px; color:var(--blue); font-size:11px; font-weight:700; text-decoration:none; border-top:1px solid var(--border); }
+.list-card-foot:hover { background:var(--blue-bg); color:var(--blue); }
+
 /* ── MOBILE ── */
 .mob-toggle { display: none; width: 30px; height: 30px; border-radius: 7px; background: var(--bg); border: 0.5px solid var(--border); align-items: center; justify-content: center; color: var(--text-2); cursor: pointer; font-size: 15px; }
 .sb-backdrop { display: none; position: fixed; inset: 0; background: rgba(11,20,55,.45); opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 9998; }
@@ -314,6 +340,7 @@ table.dt tbody tr:hover td { background: #fafbff; }
   .sb-backdrop { display: block; }
   body.sb-open .sb-backdrop { opacity: 1; pointer-events: auto; }
   .row-a, .row-b, .row-c { grid-template-columns: 1fr; }
+  .list-dashboard { grid-template-columns:1fr; }
   .kpi-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 600px) {
@@ -324,7 +351,7 @@ table.dt tbody tr:hover td { background: #fafbff; }
 }
 </style>
 </head>
-<body>
+<body class="list-dashboard-page">
 
 <!-- ═══════ SIDEBAR ═══════ -->
 <nav id="sidebar" class="sidebar">
@@ -347,6 +374,7 @@ table.dt tbody tr:hover td { background: #fafbff; }
     <a class="sb-item" href="purchase_invoice.php"><i class="ti ti-file-invoice"></i>Purchase Invoice</a>
     <a class="sb-item" href="inventory.php"><i class="ti ti-box"></i>Inventory</a>
 
+    <?php if (is_admin() || is_manager()): ?>
     <div class="sb-section">People</div>
     <a class="sb-item" href="employee_profile.php"><i class="ti ti-users"></i>Employees</a>
     <a class="sb-item" href="attendance.php">
@@ -355,6 +383,8 @@ table.dt tbody tr:hover td { background: #fafbff; }
         <span class="sb-badge"><?php echo count($unread_notifications); ?></span>
       <?php endif; ?>
     </a>
+
+    <?php endif; ?>
 
     <div class="sb-section">Logistics</div>
     <a class="sb-item" href="delivery_tracking.php"><i class="ti ti-truck-delivery"></i>Delivery Tracking</a>
@@ -407,9 +437,9 @@ table.dt tbody tr:hover td { background: #fafbff; }
         <i class="ti ti-bell"></i>
         <?php if (!empty($unread_notifications)): ?><div class="notif-dot"></div><?php endif; ?>
       </div>
-      <a href="employee_profile.php#add" class="btn-primary">
+      <?php if (is_admin() || is_manager()): ?><a href="employee_profile.php#add" class="btn-primary">
         <i class="ti ti-user-plus" style="font-size:14px"></i>Add Employee
-      </a>
+      </a><?php endif; ?>
 
       <!-- PROFILE CHIP -->
       <div class="profile-wrap" id="profileWrap">
@@ -456,6 +486,36 @@ table.dt tbody tr:hover td { background: #fafbff; }
 
   <!-- CONTENT -->
   <div class="content">
+
+    <section class="list-dashboard">
+      <div class="list-dashboard-head">
+        <div><div class="list-dashboard-title">Delivery, PO &amp; Invoice Lists</div><div class="list-dashboard-sub">Shared view for <?php echo htmlspecialchars(ucfirst(current_user_role())); ?> accounts. Records are view-only for employees.</div></div>
+      </div>
+
+      <section class="list-card">
+        <div class="list-card-head"><div class="list-card-icon"><i class="ti ti-truck-delivery"></i></div><h2>Delivery List</h2><span class="list-card-count"><?php echo count($all_deliveries); ?></span></div>
+        <div class="list-table-wrap"><table class="list-table"><thead><tr><th>Delivery</th><th>PO / Supplier</th><th>Status</th></tr></thead><tbody>
+          <?php foreach ($all_deliveries as $delivery): ?><tr><td class="ref"><?php echo htmlspecialchars($delivery['delivery_number'] ?? ('DEL-'.$delivery['id'])); ?></td><td><div class="name"><?php echo htmlspecialchars($delivery['supplier_name'] ?? '—'); ?></div><small><?php echo htmlspecialchars($delivery['po_number'] ?? 'No PO'); ?></small></td><td><span class="pill i"><?php echo htmlspecialchars(ucwords(str_replace('_',' ', $delivery['status'] ?? 'pending'))); ?></span></td></tr><?php endforeach; ?>
+          <?php if (!$all_deliveries): ?><tr><td colspan="3">No delivery records yet.</td></tr><?php endif; ?>
+        </tbody></table></div>
+      </section>
+
+      <section class="list-card">
+        <div class="list-card-head"><div class="list-card-icon"><i class="ti ti-shopping-cart"></i></div><h2>Purchase Order List</h2><span class="list-card-count"><?php echo count($all_purchase_orders); ?></span></div>
+        <div class="list-table-wrap"><table class="list-table"><thead><tr><th>PO number</th><th>Supplier</th><th>Status</th></tr></thead><tbody>
+          <?php foreach ($all_purchase_orders as $order): ?><tr><td class="ref"><?php echo htmlspecialchars($order['po_number']); ?></td><td><div class="name"><?php echo htmlspecialchars($order['supplier_name'] ?? '—'); ?></div><small><?php echo htmlspecialchars(format_currency($order['total_amount'] ?? 0)); ?></small></td><td><span class="pill p"><?php echo htmlspecialchars(ucfirst($order['status'] ?? 'pending')); ?></span></td></tr><?php endforeach; ?>
+          <?php if (!$all_purchase_orders): ?><tr><td colspan="3">No purchase orders yet.</td></tr><?php endif; ?>
+        </tbody></table></div>
+      </section>
+
+      <section class="list-card">
+        <div class="list-card-head"><div class="list-card-icon"><i class="ti ti-file-invoice"></i></div><h2>PO Invoice List</h2><span class="list-card-count"><?php echo count($all_invoices); ?></span></div>
+        <div class="list-table-wrap"><table class="list-table"><thead><tr><th>Invoice</th><th>PO / Supplier</th><th>Status</th></tr></thead><tbody>
+          <?php foreach ($all_invoices as $invoice): ?><tr><td class="ref"><?php echo htmlspecialchars($invoice['invoice_number'] ?? ('INV-'.$invoice['id'])); ?></td><td><div class="name"><?php echo htmlspecialchars($invoice['supplier_name'] ?? '—'); ?></div><small><?php echo htmlspecialchars($invoice['po_number'] ?? 'No PO'); ?></small></td><td><span class="pill s"><?php echo htmlspecialchars(ucwords(str_replace('_',' ', $invoice['status'] ?? 'pending'))); ?></span></td></tr><?php endforeach; ?>
+          <?php if (!$all_invoices): ?><tr><td colspan="3">No purchase invoices yet.</td></tr><?php endif; ?>
+        </tbody></table></div>
+      </section>
+    </section>
 
     <!-- KPI CARDS -->
     <div class="kpi-grid">
