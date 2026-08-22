@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Order Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .warning {
+            color: orange;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #results {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Purchase Order System Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Purchase Order Functionality</h2>
+        <p>This test will verify that the purchase order creation system is working correctly.</p>
+        
+        <button onclick="runTest()">Run Test</button>
+        <button onclick="window.location.href='purchase_order.php'">Go to Purchase Order Page</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        function runTest() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Running test... Please wait.</p>';
+            
+            fetch('test_po_creation.php')
+                .then(response => response.text())
+                .then(html => {
+                    resultsDiv.innerHTML = html;
+                })
+                .catch(error => {
+                    resultsDiv.innerHTML = '<p class="error">Error running test: ' + error + '</p>';
+                });
+        }
+    </script>
+</body>
+</html>

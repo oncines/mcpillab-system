@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Time-Based Attendance Logic</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .morning { background: #e3f2fd; color: #1976d2; }
+        .afternoon { background: #fff3e0; color: #f57c00; }
+        .current { background: #e8f5e8; color: #2e7d32; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Time-Based Attendance Type Test</h1>
+    
+    <div id="currentTest" class="test-result current">
+        <!-- Current time test will be shown here -->
+    </div>
+    
+    <h2>Sample Time Tests:</h2>
+    <div id="testResults">
+        <!-- Test results will be shown here -->
+    </div>
+    
+    <script>
+        // Same logic as implemented in attendance_camera.php
+        function getAttendanceTypeByTime(hour, minute = 0) {
+            const timeInMinutes = hour * 60 + minute;
+            
+            // Define shift times in minutes from midnight
+            const morningStart = 8 * 60;      // 8:00 AM = 480 minutes
+            const morningEnd = 12 * 60;       // 12:00 PM = 720 minutes  
+            const afternoonStart = 13 * 60;   // 1:00 PM = 780 minutes
+            const afternoonEnd = 17 * 60;     // 5:00 PM = 1020 minutes
+            
+            // Determine attendance type based on time
+            if (timeInMinutes >= morningStart && timeInMinutes < morningEnd - 30) {
+                // 8:00 AM - 11:30 AM: Morning clock in
+                return 'clock_in';
+            } else if (timeInMinutes >= morningEnd - 30 && timeInMinutes < morningEnd + 30) {
+                // 11:30 AM - 12:30 PM: Morning clock out
+                return 'clock_out';
+            } else if (timeInMinutes >= afternoonStart - 30 && timeInMinutes < afternoonEnd - 30) {
+                // 12:30 PM - 4:30 PM: Afternoon clock in
+                return 'clock_in';
+            } else if (timeInMinutes >= afternoonEnd - 30 && timeInMinutes <= afternoonEnd + 30) {
+                // 4:30 PM - 5:30 PM: Afternoon clock out
+                return 'clock_out';
+            } else if (timeInMinutes < morningStart) {
+                // Before 8:00 AM: Too early
+                return 'clock_in';
+            } else if (timeInMinutes > afternoonEnd + 30) {
+                // After 5:30 PM: After work
+                return 'clock_out';
+            } else {
+                // Gap periods: default based on context
+                return 'clock_in';
+            }
+        }
+        
+        function getShiftHint(hour, minute = 0) {
+            const timeInMinutes = hour * 60 + minute;
+            
+            // Define shift times in minutes from midnight
+            const morningStart = 8 * 60;      // 8:00 AM = 480 minutes
+            const morningEnd = 12 * 60;       // 12:00 PM = 720 minutes  
+            const afternoonStart = 13 * 60;   // 1:00 PM = 780 minutes
+            const afternoonEnd = 17 * 60;     // 5:00 PM = 1020 minutes
+            
+            // Determine hint based on time
+            if (timeInMinutes >= morningStart && timeInMinutes < morningEnd - 30) {
+                return 'Morning Shift (8AM-12PM): Clock In';
+            } else if (timeInMinutes >= morningEnd - 30 && timeInMinutes < morningEnd + 30) {
+                return 'Morning Shift End: Clock Out';
+            } else if (timeInMinutes >= afternoonStart - 30 && timeInMinutes < afternoonEnd - 30) {
+                return 'Afternoon Shift (1PM-5PM): Clock In';
+            } else if (timeInMinutes >= afternoonEnd - 30 && timeInMinutes <= afternoonEnd + 30) {
+                return 'Afternoon Shift End: Clock Out';
+            } else if (timeInMinutes < morningStart) {
+                return 'Before Work Hours: Clock In (when ready)';
+            } else if (timeInMinutes > afternoonEnd + 30) {
+                return 'After Work Hours: Clock Out (if finishing late)';
+            } else {
+                return 'Break Time: Default Clock In';
+            }
+        }
+        
+        function formatTime(hour) {
+            const period = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+            return `${displayHour}:00 ${period}`;
+        }
+        
+        function runTests() {
+            const now = new Date();
+            const currentHour = now.getHours();
+            
+            // Show current time test
+            const currentDiv = document.getElementById('currentTest');
+            const currentType = getAttendanceTypeByTime(currentHour);
+            currentDiv.innerHTML = `
+                <strong>Current Time: ${formatTime(currentHour)}</strong><br>
+                Attendance Type: <strong>${currentType.toUpperCase().replace('_', ' ')}</strong><br>
+                ${currentHour >= 12 ? '🌅 Afternoon/Evening - Clock Out Time' : '🌄 Morning - Clock In Time'}
+            `;
+            currentDiv.className = `test-result current ${currentHour >= 12 ? 'afternoon' : 'morning'}`;
+            
+            // Test various times throughout the day
+            const testHours = [6, 8, 11, 12, 14, 17, 20, 23];
+            const resultsDiv = document.getElementById('testResults');
+            
+            testHours.forEach(hour => {
+                const type = getAttendanceTypeByTime(hour);
+                const div = document.createElement('div');
+                div.className = `test-result ${hour >= 12 ? 'afternoon' : 'morning'}`;
+                div.innerHTML = `
+                    <strong>${formatTime(hour)}</strong> → ${type.toUpperCase().replace('_', ' ')}
+                    ${hour === currentHour ? ' ← CURRENT TIME' : ''}
+                `;
+                resultsDiv.appendChild(div);
+            });
+        }
+        
+        // Run tests when page loads
+        runTests();
+        
+        // Update every minute to show current time changes
+        setInterval(runTests, 60000);
+    </script>
+</body>
+</html>
