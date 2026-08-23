@@ -1,0 +1,11 @@
+{
+  "name": "MCPIL Laboratory Management System",
+  "description": "Comprehensive pharmaceutical laboratory operational management system with purchase orders, invoices, inventory tracking, camera attendance, delivery monitoring, and reporting.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
