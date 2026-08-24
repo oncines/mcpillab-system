@@ -27,7 +27,7 @@ interface AuthPageProps {
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuccess }) => {
-  const { login, register, loginAsRole, users } = useApp();
+  const { login, register, users } = useApp();
 
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
@@ -36,9 +36,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
   const [loading, setLoading] = useState(false);
 
   // Login Form State
+  const [loginRole, setLoginRole] = useState<'admin' | 'employee' | 'store'>('admin');
   const [loginIdentifier, setLoginIdentifier] = useState('admin');
   const [loginPassword, setLoginPassword] = useState('admin123');
   const [rememberMe, setRememberMe] = useState(true);
+
+  // Quick switch role in login
+  const handleSelectLoginRole = (role: 'admin' | 'employee' | 'store') => {
+    setLoginRole(role);
+    if (role === 'admin') {
+      setLoginIdentifier('admin');
+      setLoginPassword('admin123');
+    } else if (role === 'employee') {
+      setLoginIdentifier('alice.tech');
+      setLoginPassword('emp123');
+    } else if (role === 'store') {
+      setLoginIdentifier('store_central');
+      setLoginPassword('store123');
+    }
+  };
 
   // Register Form State
   const [regFullName, setRegFullName] = useState('');
@@ -61,15 +77,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
     setLoading(true);
 
     setTimeout(() => {
-      const res = login(loginIdentifier, loginPassword);
+      const res = login(loginIdentifier, loginPassword, loginRole);
       setLoading(false);
       if (!res.success) {
         setErrorMessage(res.message);
       } else {
-        setSuccessMessage(`Welcome, ${res.user?.full_name}! Logging in...`);
+        setSuccessMessage(`Welcome, ${res.user?.full_name}! Logging in as ${res.user?.role.toUpperCase()}...`);
         if (onSuccess) onSuccess();
       }
-    }, 400);
+    }, 350);
   };
 
   const handleRegisterSubmit = (e: React.FormEvent) => {
@@ -105,10 +121,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
     setLoading(true);
 
     setTimeout(() => {
+      const derivedUsername = regUsername.trim() || regEmail.trim().split('@')[0];
       const res = register({
         full_name: regFullName.trim(),
         email: regEmail.trim(),
-        username: regUsername.trim(),
+        username: derivedUsername,
         password: regPassword,
         role: regRole,
         department: regRole === 'employee' ? regDepartment : regRole === 'store' ? 'Warehouse & Bodega' : 'Executive Administration',
@@ -125,28 +142,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
         if (onSuccess) onSuccess();
       }
     }, 500);
-  };
-
-  const handleRoleQuickDemo = (role: 'admin' | 'employee' | 'store') => {
-    setLoading(true);
-    setTimeout(() => {
-      loginAsRole(role);
-      setLoading(false);
-      if (onSuccess) onSuccess();
-    }, 300);
-  };
-
-  const prefillDemoLogin = (role: 'admin' | 'employee' | 'store') => {
-    if (role === 'admin') {
-      setLoginIdentifier('admin');
-      setLoginPassword('admin123');
-    } else if (role === 'employee') {
-      setLoginIdentifier('alice.tech');
-      setLoginPassword('emp123');
-    } else {
-      setLoginIdentifier('store_central');
-      setLoginPassword('store123');
-    }
   };
 
   return (
@@ -192,7 +187,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
               }`}
             >
               <KeyRound className="w-4 h-4" />
-              Sign In to Account
+              Login
             </button>
             <button
               type="button"
@@ -208,7 +203,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
               }`}
             >
               <UserIcon className="w-4 h-4" />
-              Register (3 Roles)
+              Register
             </button>
           </div>
 
@@ -231,58 +226,65 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
             {/* ===================== LOGIN FORM ===================== */}
             {mode === 'login' ? (
               <form onSubmit={handleLoginSubmit} className="space-y-4">
-                {/* Role Quick Selection Pills */}
+                {/* 3-Role Selection Cards */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                    Quick Role Select
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <UserIcon className="w-3.5 h-3.5 text-teal-600" />
+                    Select Role
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {/* Admin selector */}
                     <button
                       type="button"
-                      onClick={() => prefillDemoLogin('admin')}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        loginIdentifier === 'admin'
-                          ? 'border-purple-600 bg-purple-50 text-purple-900 ring-1 ring-purple-600'
-                          : 'border-slate-200 hover:border-purple-300 hover:bg-slate-50 text-slate-700'
+                      onClick={() => handleSelectLoginRole('admin')}
+                      className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 ${
+                        loginRole === 'admin'
+                          ? 'border-purple-600 bg-purple-50/80 text-purple-950 ring-2 ring-purple-600/20 shadow-xs'
+                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-700'
                       }`}
                     >
-                      <div className="flex items-center gap-1.5 font-bold text-xs">
-                        <ShieldCheck className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                        <span>Admin</span>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                        loginRole === 'admin' ? 'bg-purple-600 text-white shadow-xs' : 'bg-purple-100 text-purple-700'
+                      }`}>
+                        <ShieldCheck className="w-4 h-4" />
                       </div>
-                      <span className="text-[10px] text-slate-500 mt-1">admin / admin123</span>
+                      <div className="font-bold text-xs">Admin</div>
                     </button>
 
+                    {/* Employee selector */}
                     <button
                       type="button"
-                      onClick={() => prefillDemoLogin('employee')}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        loginIdentifier === 'alice.tech'
-                          ? 'border-teal-600 bg-teal-50 text-teal-900 ring-1 ring-teal-600'
-                          : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50 text-slate-700'
+                      onClick={() => handleSelectLoginRole('employee')}
+                      className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 ${
+                        loginRole === 'employee'
+                          ? 'border-teal-600 bg-teal-50/80 text-teal-950 ring-2 ring-teal-600/20 shadow-xs'
+                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-700'
                       }`}
                     >
-                      <div className="flex items-center gap-1.5 font-bold text-xs">
-                        <FlaskConical className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                        <span>Employee</span>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                        loginRole === 'employee' ? 'bg-teal-600 text-white shadow-xs' : 'bg-teal-100 text-teal-700'
+                      }`}>
+                        <FlaskConical className="w-4 h-4" />
                       </div>
-                      <span className="text-[10px] text-slate-500 mt-1">alice.tech / emp123</span>
+                      <div className="font-bold text-xs">Employee</div>
                     </button>
 
+                    {/* Store selector */}
                     <button
                       type="button"
-                      onClick={() => prefillDemoLogin('store')}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        loginIdentifier === 'store_central'
-                          ? 'border-amber-600 bg-amber-50 text-amber-900 ring-1 ring-amber-600'
-                          : 'border-slate-200 hover:border-amber-300 hover:bg-slate-50 text-slate-700'
+                      onClick={() => handleSelectLoginRole('store')}
+                      className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 ${
+                        loginRole === 'store'
+                          ? 'border-amber-600 bg-amber-50/80 text-amber-950 ring-2 ring-amber-600/20 shadow-xs'
+                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-700'
                       }`}
                     >
-                      <div className="flex items-center gap-1.5 font-bold text-xs">
-                        <Store className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                        <span>Store</span>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                        loginRole === 'store' ? 'bg-amber-600 text-white shadow-xs' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        <Store className="w-4 h-4" />
                       </div>
-                      <span className="text-[10px] text-slate-500 mt-1">store / store123</span>
+                      <div className="font-bold text-xs">Store</div>
                     </button>
                   </div>
                 </div>
@@ -298,7 +300,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
                       required
-                      placeholder="e.g. admin, alice.tech, or store_central"
+                      placeholder={
+                        loginRole === 'admin'
+                          ? 'Enter admin email or username (e.g. admin)'
+                          : loginRole === 'employee'
+                          ? 'Enter employee email or username (e.g. alice.tech)'
+                          : 'Enter store / bodega email or username (e.g. store_central)'
+                      }
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 transition-all"
                     />
                   </div>
@@ -376,147 +384,138 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
             ) : (
               /* ===================== REGISTER FORM ===================== */
               <form onSubmit={handleRegisterSubmit} className="space-y-4">
-                {/* 3-Role Selection Cards */}
+                {/* Role Selection Cards matching screenshot & login tab */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                    Select Access Role (Admin / Employee / Store) *
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <UserIcon className="w-3.5 h-3.5 text-teal-600" />
+                    Select Role
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-3 gap-2.5">
                     {/* Admin selector */}
-                    <div
+                    <button
+                      type="button"
                       onClick={() => setRegRole('admin')}
-                      className={`p-3 rounded-xl border-2 transition-all cursor-pointer text-left ${
+                      className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 ${
                         regRole === 'admin'
-                          ? 'border-purple-600 bg-purple-50/70 text-purple-950 ring-2 ring-purple-600/20'
-                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                          ? 'border-purple-600 bg-purple-50/80 text-purple-950 ring-2 ring-purple-600/20 shadow-xs'
+                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-700'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="w-6 h-6 rounded bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                        </div>
-                        {regRole === 'admin' && <Check className="w-4 h-4 text-purple-700" />}
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                        regRole === 'admin' ? 'bg-purple-600 text-white shadow-xs' : 'bg-purple-100 text-purple-700'
+                      }`}>
+                        <ShieldCheck className="w-4 h-4" />
                       </div>
-                      <div className="font-bold text-xs">1. Administrator</div>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Management, Approvals & Full Clearance</p>
-                    </div>
+                      <div className="font-bold text-xs">Admin</div>
+                    </button>
 
                     {/* Employee selector */}
-                    <div
+                    <button
+                      type="button"
                       onClick={() => setRegRole('employee')}
-                      className={`p-3 rounded-xl border-2 transition-all cursor-pointer text-left ${
+                      className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 ${
                         regRole === 'employee'
-                          ? 'border-teal-600 bg-teal-50/70 text-teal-950 ring-2 ring-teal-600/20'
-                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                          ? 'border-teal-600 bg-teal-50/80 text-teal-950 ring-2 ring-teal-600/20 shadow-xs'
+                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-700'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="w-6 h-6 rounded bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
-                          <FlaskConical className="w-3.5 h-3.5" />
-                        </div>
-                        {regRole === 'employee' && <Check className="w-4 h-4 text-teal-700" />}
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                        regRole === 'employee' ? 'bg-teal-600 text-white shadow-xs' : 'bg-teal-100 text-teal-700'
+                      }`}>
+                        <FlaskConical className="w-4 h-4" />
                       </div>
-                      <div className="font-bold text-xs">2. Lab Employee</div>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Chemist, Biometric Camera & Inventory</p>
-                    </div>
+                      <div className="font-bold text-xs">Employee</div>
+                    </button>
 
                     {/* Store selector */}
-                    <div
+                    <button
+                      type="button"
                       onClick={() => setRegRole('store')}
-                      className={`p-3 rounded-xl border-2 transition-all cursor-pointer text-left ${
+                      className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 ${
                         regRole === 'store'
-                          ? 'border-amber-600 bg-amber-50/70 text-amber-950 ring-2 ring-amber-600/20'
-                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                          ? 'border-amber-600 bg-amber-50/80 text-amber-950 ring-2 ring-amber-600/20 shadow-xs'
+                          : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-700'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="w-6 h-6 rounded bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
-                          <Store className="w-3.5 h-3.5" />
-                        </div>
-                        {regRole === 'store' && <Check className="w-4 h-4 text-amber-700" />}
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                        regRole === 'store' ? 'bg-amber-600 text-white shadow-xs' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        <Store className="w-4 h-4" />
                       </div>
-                      <div className="font-bold text-xs">3. Store / Bodega</div>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Requisitions, Logistics & Deliveries</p>
-                    </div>
+                      <div className="font-bold text-xs">Store</div>
+                    </button>
                   </div>
                 </div>
 
-                {/* Form fields grid */}
+                {/* Full Name */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <UserIcon className="w-3.5 h-3.5 text-slate-400" />
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={regFullName}
+                    onChange={(e) => setRegFullName(e.target.value)}
+                    required
+                    placeholder="Enter your full name"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 transition-all"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-slate-400" />
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
+                    required
+                    placeholder={
+                      regRole === 'admin'
+                        ? 'Enter your admin email address'
+                        : regRole === 'employee'
+                        ? 'Enter your employee email address'
+                        : 'Enter your store email address'
+                    }
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 transition-all"
+                  />
+                </div>
+
+                {/* Password & Confirm Password Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
-                    <input
-                      type="text"
-                      value={regFullName}
-                      onChange={(e) => setRegFullName(e.target.value)}
-                      required
-                      placeholder="e.g. Dr. Arthur Vance or Jane Doe"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                    />
-                  </div>
-
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Email Address *</label>
-                    <input
-                      type="email"
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                      required
-                      placeholder="name@mcpillab.com"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Username *</label>
-                    <input
-                      type="text"
-                      value={regUsername}
-                      onChange={(e) => setRegUsername(e.target.value)}
-                      required
-                      placeholder="e.g. jdoe_lab"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Password *</label>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-slate-400" />
+                      Password
+                    </label>
                     <input
                       type="password"
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
                       required
-                      placeholder="Min 5 characters"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                      placeholder="Enter password"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Confirm Password *</label>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-slate-400" />
+                      Confirm Password
+                    </label>
                     <input
                       type="password"
                       value={regConfirmPassword}
                       onChange={(e) => setRegConfirmPassword(e.target.value)}
                       required
-                      placeholder="Re-type password"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                      placeholder="Confirm password"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 transition-all"
                     />
                   </div>
-                </div>
-
-                <div className="pt-2">
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={agreeTerms}
-                      onChange={(e) => setAgreeTerms(e.target.checked)}
-                      className="mt-0.5 rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4"
-                    />
-                    <span className="text-[11px] text-slate-600 leading-tight">
-                      I acknowledge compliance with Good Laboratory Practice (GLP), chemical handling security, and
-                      MCPIL operating protocols.
-                    </span>
-                  </label>
                 </div>
 
                 <button
@@ -524,7 +523,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
                   disabled={loading}
                   className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-md shadow-teal-700/20 transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:opacity-50"
                 >
-                  {loading ? 'Creating Account...' : `Register as ${regRole.toUpperCase()} & Enter Portal`}
+                  {loading ? 'Creating Account...' : 'Register'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
@@ -533,9 +532,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
                   <button
                     type="button"
                     onClick={() => setMode('login')}
-                    className="text-teal-700 font-bold hover:underline"
+                    className="text-teal-700 font-bold hover:underline cursor-pointer"
                   >
-                    Sign in here →
+                    Login here →
                   </button>
                 </div>
               </form>

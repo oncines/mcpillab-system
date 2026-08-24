@@ -97,14 +97,6 @@ export const Sidebar: React.FC<{ isOpen?: boolean; setIsOpen?: (val: boolean) =>
       allowedRoles: ['admin', 'employee'],
     },
     {
-      id: 'camera_attendance',
-      label: 'Camera Station (Photo/GPS)',
-      icon: Camera,
-      badgeColor: 'bg-teal-500 text-white',
-      category: 'lab',
-      allowedRoles: ['admin', 'employee'],
-    },
-    {
       id: 'delivery_tracking',
       label: 'Live Delivery Tracker',
       icon: Truck,

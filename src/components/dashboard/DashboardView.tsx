@@ -225,6 +225,35 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
+      {/* Live Cold-Chain Delivery Quick Tracker Strip */}
+      {deliveries.filter((d) => d.status === 'in_transit').length > 0 && (
+        <div className="bg-slate-950 text-white p-4 rounded-2xl border border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold shrink-0">
+              <Truck className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-teal-400 uppercase tracking-wider">Live En-Route Cold-Chain Dispatch</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-700 font-mono">
+                  {deliveries.find((d) => d.status === 'in_transit')?.temperature_celsius || 4.6}°C OPTIMAL
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                <span className="font-mono font-bold text-white">{deliveries.find((d) => d.status === 'in_transit')?.tracking_number}</span> ({deliveries.find((d) => d.status === 'in_transit')?.carrier}) • Currently at {deliveries.find((d) => d.status === 'in_transit')?.current_location || 'Transit Corridor'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setActiveTab('delivery_tracking')}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+          >
+            Track in Live GPS <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Charts & Quick Visuals Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* PO Status Breakdown Chart */}

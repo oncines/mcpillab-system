@@ -47,7 +47,7 @@ interface AppContextType {
   setCurrentUser: (user: User) => void;
   isAuthenticated: boolean;
   users: User[];
-  login: (identifier: string, password?: string) => { success: boolean; message: string; user?: User };
+  login: (identifier: string, password?: string, requiredRole?: 'admin' | 'employee' | 'store') => { success: boolean; message: string; user?: User };
   loginAsRole: (role: 'admin' | 'employee' | 'store') => void;
   register: (userData: {
     full_name: string;
@@ -101,6 +101,8 @@ interface AppContextType {
 
   createDelivery: (delivery: Omit<Delivery, 'id' | 'created_at' | 'timeline'>) => Delivery;
   updateDeliveryStatus: (id: number, status: DeliveryStatus, locationNote?: string) => void;
+  addDeliveryCheckpoint: (id: number, checkpoint: { status: DeliveryStatus; description: string; location: string; temperature?: number }) => void;
+  receiveDeliveryIntoStock: (id: number, inspectorSignature: string, notes?: string) => void;
 
   addSupplier: (supplier: Omit<Supplier, 'id'>) => void;
   updateSupplier: (id: number, supplier: Partial<Supplier>) => void;
@@ -133,10 +135,28 @@ function saveStorage<T>(key: string, data: T) {
   }
 }
 
+function loadSession<T>(key: string, fallback: T): T {
+  try {
+    const saved = sessionStorage.getItem(LOCAL_STORAGE_KEY_PREFIX + key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveSession<T>(key: string, data: T) {
+  try {
+    sessionStorage.setItem(LOCAL_STORAGE_KEY_PREFIX + key, JSON.stringify(data));
+  } catch (err) {
+    console.error(`Error saving ${key} to session:`, err);
+  }
+}
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>(() => loadStorage('users', initialUsers));
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => loadStorage('is_authenticated', true));
-  const [currentUser, setCurrentUser] = useState<User | null>(() => loadStorage('current_user', initialUsers[0]));
+  // Default to false so the user is always prompted to log in / register first when opening the application link
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => loadSession('is_authenticated', false));
+  const [currentUser, setCurrentUser] = useState<User | null>(() => loadSession('current_user', null));
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -151,10 +171,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [transactions, setTransactions] = useState<InventoryTransaction[]>(() => loadStorage('transactions', initialTransactions));
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => loadStorage('notifications', initialNotifications));
 
-  // Sync to storage
+  // Sync to storage & session
   useEffect(() => saveStorage('users', users), [users]);
-  useEffect(() => saveStorage('is_authenticated', isAuthenticated), [isAuthenticated]);
-  useEffect(() => saveStorage('current_user', currentUser), [currentUser]);
+  useEffect(() => {
+    saveSession('is_authenticated', isAuthenticated);
+    // clean up legacy localStorage key if present
+    try { localStorage.removeItem(LOCAL_STORAGE_KEY_PREFIX + 'is_authenticated'); } catch {}
+  }, [isAuthenticated]);
+  useEffect(() => {
+    saveSession('current_user', currentUser);
+    try { localStorage.removeItem(LOCAL_STORAGE_KEY_PREFIX + 'current_user'); } catch {}
+  }, [currentUser]);
   useEffect(() => saveStorage('employees', employees), [employees]);
   useEffect(() => saveStorage('suppliers', suppliers), [suppliers]);
   useEffect(() => saveStorage('inventory', inventory), [inventory]);
@@ -177,16 +204,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications((prev) => [newNotif, ...prev]);
   };
 
-  const login = (identifier: string, password?: string) => {
+  const login = (identifier: string, password?: string, requiredRole?: 'admin' | 'employee' | 'store') => {
     const trimmed = identifier.trim().toLowerCase();
-    const foundUser = users.find(
+    let foundUser = users.find(
       (u) =>
         u.username?.toLowerCase() === trimmed ||
         u.email.toLowerCase() === trimmed
     );
 
+    // If identifier was omitted or matches role name, match by role
+    if (!foundUser && (!identifier || trimmed === requiredRole) && requiredRole) {
+      foundUser = users.find((u) => u.role === requiredRole);
+    }
+
     if (!foundUser) {
       return { success: false, message: 'No registered user found with this email or username.' };
+    }
+
+    if (requiredRole && foundUser.role !== requiredRole) {
+      return {
+        success: false,
+        message: `Role mismatch: This account has '${foundUser.role.toUpperCase()}' credentials, but '${requiredRole.toUpperCase()}' role was selected.`,
+      };
     }
 
     if (password && foundUser.password && foundUser.password !== password) {
@@ -300,6 +339,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const logout = () => {
     setIsAuthenticated(false);
+    setCurrentUser(null);
+    try {
+      sessionStorage.removeItem(LOCAL_STORAGE_KEY_PREFIX + 'is_authenticated');
+      sessionStorage.removeItem(LOCAL_STORAGE_KEY_PREFIX + 'current_user');
+      localStorage.removeItem(LOCAL_STORAGE_KEY_PREFIX + 'is_authenticated');
+      localStorage.removeItem(LOCAL_STORAGE_KEY_PREFIX + 'current_user');
+    } catch {}
     addNotification({
       title: 'Session Ended',
       message: 'You have signed out from the MCPIL Laboratory system.',
@@ -655,6 +701,108 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
+  const addDeliveryCheckpoint = (id: number, checkpoint: { status: DeliveryStatus; description: string; location: string; temperature?: number }) => {
+    setDeliveries((prev) =>
+      prev.map((del) => {
+        if (del.id === id) {
+          const newTimelineItem = {
+            status: checkpoint.status,
+            timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+            description: checkpoint.description,
+            location: checkpoint.location,
+          };
+          return {
+            ...del,
+            status: checkpoint.status,
+            current_location: checkpoint.location,
+            temperature_celsius: checkpoint.temperature !== undefined ? checkpoint.temperature : del.temperature_celsius,
+            timeline: [...del.timeline, newTimelineItem],
+          };
+        }
+        return del;
+      })
+    );
+
+    addNotification({
+      title: `Shipment Checkpoint Logged`,
+      message: `Delivery #${id}: ${checkpoint.description} (${checkpoint.location})`,
+      type: 'delivery',
+      link: 'delivery_tracking',
+    });
+  };
+
+  const receiveDeliveryIntoStock = (id: number, inspectorSignature: string, notes?: string) => {
+    const delivery = deliveries.find((d) => d.id === id);
+    if (!delivery) return;
+
+    const receiptDate = new Date().toISOString().split('T')[0];
+    const receiptTime = new Date().toISOString().replace('T', ' ').substring(0, 16);
+
+    // 1. Update delivery status to delivered
+    setDeliveries((prev) =>
+      prev.map((del) => {
+        if (del.id === id) {
+          const updatedItems = del.items.map((item) => ({
+            ...item,
+            quantity_delivered: item.quantity_ordered,
+            quantity_pending: 0,
+            condition_status: 'good' as const,
+          }));
+
+          const completionTimeline = {
+            status: 'delivered' as const,
+            timestamp: receiptTime,
+            description: `Items inspected & accepted at Bodega by ${inspectorSignature}. ${notes || 'Condition intact.'}`,
+            location: 'MCPIL Bodega Warehouse Receiving Dock',
+          };
+
+          return {
+            ...del,
+            status: 'delivered' as const,
+            delivery_date: receiptDate,
+            estimated_delivery: receiptDate,
+            recipient_signature: inspectorSignature,
+            items: updatedItems,
+            current_location: 'Delivered at MCPIL Bodega Receiving Dock',
+            speed_kmh: 0,
+            timeline: [...del.timeline, completionTimeline],
+          };
+        }
+        return del;
+      })
+    );
+
+    // 2. Increment stock in inventory if items match inventory names
+    delivery.items.forEach((delItem) => {
+      const matchedInv = inventory.find(
+        (inv) =>
+          inv.item_name.toLowerCase().includes(delItem.item_name.toLowerCase().slice(0, 8)) ||
+          delItem.item_name.toLowerCase().includes(inv.item_name.toLowerCase().slice(0, 8))
+      );
+
+      if (matchedInv) {
+        adjustStock(
+          matchedInv.id,
+          { bodega: delItem.quantity_ordered },
+          `Stock received from delivery ${delivery.delivery_number} (${delivery.supplier_name})`,
+          delivery.delivery_number
+        );
+      }
+    });
+
+    // 3. Mark corresponding PO as Completed if matched
+    if (delivery.po_id) {
+      updatePOStatus(delivery.po_id, 'Completed', `All goods received via shipment ${delivery.delivery_number}`);
+    }
+
+    addNotification({
+      title: 'Delivery Received & Stock Posted',
+      message: `${delivery.delivery_number} accepted by ${inspectorSignature}. Inventory quantities automatically updated!`,
+      type: 'delivery',
+      link: 'delivery_tracking',
+    });
+  };
+
   const addSupplier = (supData: Omit<Supplier, 'id'>) => {
     const nextId = suppliers.length > 0 ? Math.max(...suppliers.map((s) => s.id)) + 1 : 1;
     setSuppliers((prev) => [...prev, { ...supData, id: nextId }]);
@@ -720,6 +868,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateAttendanceStatus,
         createDelivery,
         updateDeliveryStatus,
+        addDeliveryCheckpoint,
+        receiveDeliveryIntoStock,
         addSupplier,
         updateSupplier,
         markNotificationRead,
