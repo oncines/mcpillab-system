@@ -170,6 +170,7 @@ export interface AttendanceRecord {
   total_hours: number;
   status: AttendanceStatus;
   notes: string;
+  location?: string;
   camera_captures?: CameraAttendanceLog[];
 }
 

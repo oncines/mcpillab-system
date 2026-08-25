@@ -101,47 +101,41 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onSuc
       setErrorMessage('Please provide a valid email address.');
       return;
     }
-    if (!regUsername.trim()) {
-      setErrorMessage('Please choose a username.');
-      return;
-    }
-    if (regPassword.length < 5) {
-      setErrorMessage('Password must be at least 5 characters.');
+    if (regPassword.length < 4) {
+      setErrorMessage('Password must be at least 4 characters.');
       return;
     }
     if (regPassword !== regConfirmPassword) {
-      setErrorMessage('Passwords do not match. Please verify.');
-      return;
-    }
-    if (!agreeTerms) {
-      setErrorMessage('You must acknowledge the GLP laboratory security guidelines.');
+      setErrorMessage('Passwords do not match. Please re-enter your password.');
       return;
     }
 
     setLoading(true);
 
     setTimeout(() => {
-      const derivedUsername = regUsername.trim() || regEmail.trim().split('@')[0];
+      // Auto derive a clean username from email or full name
+      const baseUsername = regEmail.trim().split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || regFullName.trim().toLowerCase().replace(/\s+/g, '.');
+      
       const res = register({
         full_name: regFullName.trim(),
         email: regEmail.trim(),
-        username: derivedUsername,
+        username: baseUsername,
         password: regPassword,
         role: regRole,
         department: regRole === 'employee' ? regDepartment : regRole === 'store' ? 'Warehouse & Bodega' : 'Executive Administration',
         store_name: regRole === 'store' ? regStoreName : undefined,
-        phone: regPhone.trim(),
-        employee_id: regRole === 'employee' ? regEmployeeId : undefined,
+        phone: regPhone.trim() || '+1-555-0199',
+        employee_id: regRole === 'employee' ? `EMP-00${users.length + 1}` : undefined,
       });
 
       setLoading(false);
       if (!res.success) {
         setErrorMessage(res.message);
       } else {
-        setSuccessMessage(`Account created successfully as ${regRole.toUpperCase()}! Entering system...`);
+        setSuccessMessage(`Account created successfully as ${regRole.toUpperCase()}! Logging in...`);
         if (onSuccess) onSuccess();
       }
-    }, 500);
+    }, 350);
   };
 
   return (

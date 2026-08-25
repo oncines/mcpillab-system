@@ -52,7 +52,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; setIsOpen?: (val: boolean) =>
   const navItems: NavItem[] = [
     {
       id: 'dashboard',
-      label: 'Operations Dashboard',
+      label: userRole === 'employee' ? 'Employee Home' : 'Operations Dashboard',
       icon: LayoutDashboard,
       category: 'core',
       allowedRoles: ['admin', 'employee', 'store'],
@@ -83,16 +83,23 @@ export const Sidebar: React.FC<{ isOpen?: boolean; setIsOpen?: (val: boolean) =>
       allowedRoles: ['admin', 'employee', 'store'],
     },
     {
-      id: 'employees',
-      label: 'Staff & Personnel',
-      icon: Users,
+      id: 'camera_attendance',
+      label: 'Biometric Camera Check-in',
+      icon: Camera,
+      category: 'lab',
+      allowedRoles: ['admin', 'employee', 'store'],
+    },
+    {
+      id: 'attendance',
+      label: 'Attendance Monitor & Timesheet',
+      icon: Clock,
       category: 'lab',
       allowedRoles: ['admin', 'employee'],
     },
     {
-      id: 'attendance',
-      label: 'Attendance Monitor',
-      icon: Clock,
+      id: 'employees',
+      label: 'Staff & Personnel',
+      icon: Users,
       category: 'lab',
       allowedRoles: ['admin', 'employee'],
     },
@@ -103,7 +110,7 @@ export const Sidebar: React.FC<{ isOpen?: boolean; setIsOpen?: (val: boolean) =>
       badge: activeDeliveriesCount > 0 ? activeDeliveriesCount : undefined,
       badgeColor: 'bg-emerald-600 text-white',
       category: 'logistics',
-      allowedRoles: ['admin', 'store'],
+      allowedRoles: ['admin', 'employee', 'store'],
     },
     {
       id: 'delivery_history',

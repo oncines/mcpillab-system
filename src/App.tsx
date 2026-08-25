@@ -4,6 +4,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Navbar } from './components/layout/Navbar';
 import { AuthPage } from './components/auth/AuthPage';
 import { DashboardView } from './components/dashboard/DashboardView';
+import { EmployeeHomeView } from './components/dashboard/EmployeeHomeView';
 import { PurchaseOrderView } from './components/purchase/PurchaseOrderView';
 import { InvoiceView } from './components/invoices/InvoiceView';
 import { InventoryView } from './components/inventory/InventoryView';
@@ -15,13 +16,13 @@ import { SupplierView } from './components/suppliers/SupplierView';
 import { ReportsView } from './components/reports/ReportsView';
 
 const MainLayout: React.FC = () => {
-  const { activeTab } = useApp();
+  const { activeTab, currentUser } = useApp();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const renderActiveView = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardView />;
+        return currentUser?.role === 'employee' ? <EmployeeHomeView /> : <DashboardView />;
       case 'purchase_orders':
         return <PurchaseOrderView />;
       case 'invoices':

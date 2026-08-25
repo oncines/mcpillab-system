@@ -29,6 +29,7 @@ import {
   initialTransactions,
   initialNotifications,
 } from '../data/initialData';
+import { syncDocToFirestore, COLLECTIONS } from '../firebase';
 
 export type NavTab =
   | 'dashboard'
@@ -268,13 +269,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     avatar?: string;
   }) => {
     const trimmedEmail = userData.email.trim().toLowerCase();
-    const trimmedUsername = userData.username.trim().toLowerCase();
+    let trimmedUsername = userData.username.trim().toLowerCase();
 
     if (users.some((u) => u.email.toLowerCase() === trimmedEmail)) {
-      return { success: false, message: 'An account with this email is already registered.' };
+      return { success: false, message: 'An account with this email is already registered. Please log in.' };
     }
+    
+    // Auto make username unique if duplicate
     if (users.some((u) => u.username?.toLowerCase() === trimmedUsername)) {
-      return { success: false, message: 'This username is already taken. Please choose another.' };
+      trimmedUsername = `${trimmedUsername}_${Math.floor(100 + Math.random() * 900)}`;
     }
 
     const nextId = users.length > 0 ? Math.max(...users.map((u) => u.id)) + 1 : 1;
@@ -308,6 +311,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setUsers((prev) => [...prev, newUser]);
     setCurrentUser(newUser);
     setIsAuthenticated(true);
+
+    // Sync user record to Firestore in the cloud
+    syncDocToFirestore(COLLECTIONS.USERS, newUser.id, newUser);
 
     if (userData.role === 'employee') {
       const nameParts = userData.full_name.trim().split(' ');
@@ -381,6 +387,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setPurchaseOrders((prev) => [newPO, ...prev]);
+
+    // Sync PO to Firestore
+    syncDocToFirestore(COLLECTIONS.PURCHASE_ORDERS, newPO.id, newPO);
 
     addNotification({
       title: 'New Purchase Order Created',
@@ -488,6 +497,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setInventory((prev) => [newItem, ...prev]);
+
+    // Sync inventory item to Firestore
+    syncDocToFirestore(COLLECTIONS.INVENTORY, newItem.id, newItem);
 
     // Record beginning transaction
     const newTx: InventoryTransaction = {
@@ -604,8 +616,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (idx >= 0) {
         const copy = [...prev];
         copy[idx] = { ...copy[idx], ...newRecord };
+        syncDocToFirestore(COLLECTIONS.ATTENDANCE, copy[idx].id, copy[idx]);
         return copy;
       }
+      syncDocToFirestore(COLLECTIONS.ATTENDANCE, newRecord.id, newRecord);
       return [newRecord, ...prev];
     });
   };
@@ -662,6 +676,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ],
     };
     setDeliveries((prev) => [newDel, ...prev]);
+
+    // Sync delivery to Firestore
+    syncDocToFirestore(COLLECTIONS.DELIVERIES, newDel.id, newDel);
 
     addNotification({
       title: 'Delivery Shipment Registered',
