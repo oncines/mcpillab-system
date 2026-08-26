@@ -38,6 +38,7 @@ export type NavTab =
   | 'inventory'
   | 'employees'
   | 'attendance'
+  | 'attendance_history'
   | 'camera_attendance'
   | 'delivery_tracking'
   | 'delivery_history'
@@ -90,6 +91,7 @@ interface AppContextType {
 
   addInventoryItem: (item: Omit<InventoryItem, 'id' | 'total_stock' | 'total_amount' | 'suggested_order' | 'last_updated'>) => void;
   updateInventoryItem: (id: number, updates: Partial<InventoryItem>) => void;
+  deleteInventoryItem: (id: number) => void;
   adjustStock: (itemId: number, changes: { bodega?: number; shelves?: number; delivery?: number }, notes: string, refNo?: string) => void;
 
   addEmployee: (employee: Omit<Employee, 'id'>) => void;
@@ -536,6 +538,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
+  const deleteInventoryItem = (id: number) => {
+    const itemToDelete = inventory.find((i) => i.id === id);
+    setInventory((prev) => prev.filter((item) => item.id !== id));
+    if (itemToDelete) {
+      addNotification({
+        title: 'Inventory Item Removed',
+        message: `${itemToDelete.item_name} (${itemToDelete.barcode}) was removed from active laboratory inventory.`,
+        type: 'system',
+        link: 'inventory',
+      });
+    }
+  };
+
   const adjustStock = (
     itemId: number,
     changes: { bodega?: number; shelves?: number; delivery?: number },
@@ -876,6 +891,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateInvoiceStatus,
         addInventoryItem,
         updateInventoryItem,
+        deleteInventoryItem,
         adjustStock,
         addEmployee,
         updateEmployee,

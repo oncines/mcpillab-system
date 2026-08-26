@@ -10,6 +10,7 @@ import { InvoiceView } from './components/invoices/InvoiceView';
 import { InventoryView } from './components/inventory/InventoryView';
 import { EmployeeView } from './components/employees/EmployeeView';
 import { AttendanceView } from './components/attendance/AttendanceView';
+import { AttendanceHistoryView } from './components/attendance/AttendanceHistoryView';
 import { CameraAttendanceView } from './components/attendance/CameraAttendanceView';
 import { DeliveryView } from './components/delivery/DeliveryView';
 import { SupplierView } from './components/suppliers/SupplierView';
@@ -32,7 +33,9 @@ const MainLayout: React.FC = () => {
       case 'employees':
         return <EmployeeView />;
       case 'attendance':
-        return <AttendanceView />;
+        return currentUser?.role === 'employee' ? <AttendanceHistoryView /> : <AttendanceView />;
+      case 'attendance_history':
+        return <AttendanceHistoryView />;
       case 'camera_attendance':
         return <CameraAttendanceView />;
       case 'delivery_tracking':

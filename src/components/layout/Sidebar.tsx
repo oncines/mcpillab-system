@@ -1,33 +1,20 @@
 import React from 'react';
-import { useApp, NavTab } from '../../context/AppContext';
+import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard,
+  Box,
+  Camera,
+  Calendar,
+  Truck,
+  BarChart2,
+  MessageSquare,
+  Settings,
+  LogOut,
+  Users,
   FileText,
   Receipt,
-  Boxes,
-  Users,
-  Clock,
-  Camera,
-  Truck,
   History,
-  BarChart3,
-  BotMessageSquare,
-  Building2,
-  ShieldCheck,
-  FlaskConical,
-  Store,
-  LogOut,
 } from 'lucide-react';
-
-interface NavItem {
-  id: NavTab;
-  label: string;
-  icon: React.ElementType;
-  badge?: number;
-  badgeColor?: string;
-  category: 'core' | 'lab' | 'logistics' | 'analytics';
-  allowedRoles?: ('admin' | 'employee' | 'store')[];
-}
 
 export const Sidebar: React.FC<{ isOpen?: boolean; setIsOpen?: (val: boolean) => void }> = ({
   isOpen,
@@ -36,325 +23,279 @@ export const Sidebar: React.FC<{ isOpen?: boolean; setIsOpen?: (val: boolean) =>
   const {
     activeTab,
     setActiveTab,
-    purchaseOrders,
-    inventory,
-    deliveries,
     currentUser,
     logout,
+    deliveries,
   } = useApp();
 
-  const userRole = (currentUser?.role || 'employee') as 'admin' | 'employee' | 'store';
+  const isEmployee = currentUser?.role === 'employee';
+  const isStore = currentUser?.role === 'store';
+  const unreadMessages = 2;
 
-  const pendingPOCount = purchaseOrders.filter((p) => p.status === 'Pending').length;
-  const lowStockCount = inventory.filter((i) => i.total_stock <= i.min_stock_level).length;
-  const activeDeliveriesCount = deliveries.filter((d) => d.status === 'in_transit' || d.status === 'pending').length;
-
-  const navItems: NavItem[] = [
-    {
-      id: 'dashboard',
-      label: userRole === 'employee' ? 'Employee Home' : 'Operations Dashboard',
-      icon: LayoutDashboard,
-      category: 'core',
-      allowedRoles: ['admin', 'employee', 'store'],
-    },
-    {
-      id: 'purchase_orders',
-      label: userRole === 'store' ? 'Store Requisitions (PO)' : 'Purchase Orders',
-      icon: FileText,
-      badge: pendingPOCount > 0 ? pendingPOCount : undefined,
-      badgeColor: 'bg-amber-500 text-white',
-      category: 'core',
-      allowedRoles: ['admin', 'store'],
-    },
-    {
-      id: 'invoices',
-      label: 'Purchase Invoices',
-      icon: Receipt,
-      category: 'core',
-      allowedRoles: ['admin'],
-    },
-    {
-      id: 'inventory',
-      label: userRole === 'store' ? 'Bodega Stock Ledger' : 'Inventory & Reagents',
-      icon: Boxes,
-      badge: lowStockCount > 0 ? lowStockCount : undefined,
-      badgeColor: 'bg-rose-500 text-white',
-      category: 'lab',
-      allowedRoles: ['admin', 'employee', 'store'],
-    },
-    {
-      id: 'camera_attendance',
-      label: 'Biometric Camera Check-in',
-      icon: Camera,
-      category: 'lab',
-      allowedRoles: ['admin', 'employee', 'store'],
-    },
-    {
-      id: 'attendance',
-      label: 'Attendance Monitor & Timesheet',
-      icon: Clock,
-      category: 'lab',
-      allowedRoles: ['admin', 'employee'],
-    },
-    {
-      id: 'employees',
-      label: 'Staff & Personnel',
-      icon: Users,
-      category: 'lab',
-      allowedRoles: ['admin', 'employee'],
-    },
-    {
-      id: 'delivery_tracking',
-      label: 'Live Delivery Tracker',
-      icon: Truck,
-      badge: activeDeliveriesCount > 0 ? activeDeliveriesCount : undefined,
-      badgeColor: 'bg-emerald-600 text-white',
-      category: 'logistics',
-      allowedRoles: ['admin', 'employee', 'store'],
-    },
-    {
-      id: 'delivery_history',
-      label: 'Delivery History & Logs',
-      icon: History,
-      category: 'logistics',
-      allowedRoles: ['admin', 'store'],
-    },
-    {
-      id: 'reports',
-      label: 'Reports & Analytics',
-      icon: BarChart3,
-      category: 'analytics',
-      allowedRoles: ['admin', 'employee', 'store'],
-    },
-  ];
-
-  const filteredItems = navItems.filter(
-    (item) => !item.allowedRoles || item.allowedRoles.includes(userRole)
-  );
-
-  const roleMeta = {
-    admin: {
-      name: 'Administrator',
-      desc: 'Full Oversight & Clearance',
-      icon: ShieldCheck,
-      badge: 'bg-purple-100 text-purple-800 border-purple-200',
-    },
-    employee: {
-      name: 'Laboratory Employee',
-      desc: 'Reagents & Attendance',
-      icon: FlaskConical,
-      badge: 'bg-teal-100 text-teal-800 border-teal-200',
-    },
-    store: {
-      name: 'Store Custodian',
-      desc: 'Warehouse & Deliveries',
-      icon: Store,
-      badge: 'bg-amber-100 text-amber-800 border-amber-200',
-    },
-  }[userRole] || {
-    name: 'Staff Member',
-    desc: 'System Access',
-    icon: FlaskConical,
-    badge: 'bg-slate-100 text-slate-800 border-slate-200',
-  };
-
-  const RoleIcon = roleMeta.icon;
-
+  // Custom styling that exactly mirrors employee_home.php sidebar
   return (
-    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 no-print select-none">
-      {/* Role Indicator Banner */}
-      <div className="p-3.5 border-b border-slate-100 bg-slate-50/70">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-teal-50 text-teal-700 border border-teal-200/50 shrink-0">
-            <RoleIcon className="w-4 h-4" />
+    <aside className="w-56 bg-[#0d1b3e] text-white flex flex-col shrink-0 min-h-screen z-40 select-none border-r border-white/5">
+      {/* Brand Header */}
+      <div className="flex items-center gap-2.5 p-4 border-b border-white/10 shrink-0">
+        <div className="w-9 h-9 rounded-full border-2 border-white/30 overflow-hidden shrink-0 flex items-center justify-center bg-[#1a2a5e]">
+          <img
+            src="/logo.png"
+            alt="McPIL"
+            className="w-full h-full object-cover block"
+            onError={(e) => {
+              (e.currentTarget as HTMLElement).style.display = 'none';
+              if (e.currentTarget.nextElementSibling) {
+                (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
+              }
+            }}
+          />
+          <span className="text-[10px] font-black text-white hidden">McP</span>
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs font-black tracking-wider text-white uppercase leading-tight">
+            McPIL
           </div>
-          <div className="min-w-0">
-            <div className="text-xs font-bold text-slate-800 truncate">
-              {currentUser?.full_name || 'Laboratory Staff'}
-            </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold uppercase border ${roleMeta.badge}`}>
-                {userRole}
-              </span>
-              <span className="text-[10px] text-slate-400 truncate">{roleMeta.desc}</span>
-            </div>
+          <div className="text-[9px] text-white/40 tracking-wider uppercase truncate max-w-[120px] mt-0.5">
+            Pharmaceutical Lab...
           </div>
         </div>
       </div>
 
-      {/* Nav List */}
-      <div className="flex-1 py-3 px-3 space-y-5 overflow-y-auto">
-        {/* Core Operations */}
-        {filteredItems.filter((i) => i.category === 'core').length > 0 && (
-          <div>
-            <div className="px-3 mb-1.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-              {userRole === 'store' ? 'Store Operations' : 'Procurement & Finance'}
-            </div>
-            <nav className="space-y-1">
-              {filteredItems
-                .filter((item) => item.category === 'core')
-                .map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
+      {/* Nav Menu */}
+      <div className="flex-1 px-2.5 py-2 overflow-y-auto space-y-3">
+        {/* MAIN SECTION */}
+        <div>
+          <div className="text-[9.5px] font-bold tracking-widest text-white/30 uppercase px-2.5 py-1.5">
+            Main
+          </div>
+          <div className="space-y-0.5">
+            <button
+              onClick={() => {
+                setActiveTab('dashboard');
+                if (setIsOpen) setIsOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left ${
+                activeTab === 'dashboard'
+                  ? 'bg-white/15 text-white font-semibold shadow-xs'
+                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <LayoutDashboard className="w-[18px] h-[18px] shrink-0 text-center" />
+              <span>Home</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('inventory');
+                if (setIsOpen) setIsOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left ${
+                activeTab === 'inventory'
+                  ? 'bg-white/15 text-white font-semibold shadow-xs'
+                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <Box className="w-[18px] h-[18px] shrink-0 text-center" />
+              <span>Inventory</span>
+            </button>
+
+            {!isEmployee && (
+              <>
+                <button
+                  onClick={() => {
+                    setActiveTab('purchase_orders');
+                    if (setIsOpen) setIsOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left ${
+                    activeTab === 'purchase_orders'
+                      ? 'bg-white/15 text-white font-semibold shadow-xs'
+                      : 'text-white/70 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <FileText className="w-[18px] h-[18px] shrink-0 text-center" />
+                  <span>Purchase Orders</span>
+                </button>
+                {!isStore && (
+                  <>
                     <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg transition-all ${
-                        isActive
-                          ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/20'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      onClick={() => {
+                        setActiveTab('invoices');
+                        if (setIsOpen) setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left ${
+                        activeTab === 'invoices'
+                          ? 'bg-white/15 text-white font-semibold shadow-xs'
+                          : 'text-white/70 hover:bg-white/5 hover:text-white'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                        <span>{item.label}</span>
-                      </div>
-                      {item.badge !== undefined && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${item.badgeColor}`}>
-                          {item.badge}
-                        </span>
-                      )}
+                      <Receipt className="w-[18px] h-[18px] shrink-0 text-center" />
+                      <span>Invoices</span>
                     </button>
-                  );
-                })}
-            </nav>
+                    <button
+                      onClick={() => {
+                        setActiveTab('employees');
+                        if (setIsOpen) setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left ${
+                        activeTab === 'employees'
+                          ? 'bg-white/15 text-white font-semibold shadow-xs'
+                          : 'text-white/70 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <Users className="w-[18px] h-[18px] shrink-0 text-center" />
+                      <span>Staff</span>
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ATTENDANCE SECTION */}
+        <div>
+          <div className="text-[9.5px] font-bold tracking-widest text-white/30 uppercase px-2.5 py-1.5">
+            Attendance
+          </div>
+          <div className="space-y-0.5">
+            <button
+              onClick={() => {
+                setActiveTab('camera_attendance');
+                if (setIsOpen) setIsOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left ${
+                activeTab === 'camera_attendance'
+                  ? 'bg-white/15 text-white font-semibold shadow-xs'
+                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <Camera className="w-[18px] h-[18px] shrink-0 text-center" />
+              <span>Attendance</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('attendance');
+                if (setIsOpen) setIsOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left ${
+                activeTab === 'attendance'
+                  ? 'bg-white/15 text-white font-semibold shadow-xs'
+                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <Calendar className="w-[18px] h-[18px] shrink-0 text-center" />
+              <span>Attendance History</span>
+            </button>
+          </div>
+        </div>
+
+        {/* LOGISTICS SECTION */}
+        {!isEmployee && (
+          <div>
+            <div className="text-[9.5px] font-bold tracking-widest text-white/30 uppercase px-2.5 py-1.5">
+              Logistics
+            </div>
+            <div className="space-y-0.5">
+              <button
+                onClick={() => {
+                  setActiveTab('delivery_tracking');
+                  if (setIsOpen) setIsOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left ${
+                  activeTab === 'delivery_tracking'
+                    ? 'bg-white/15 text-white font-semibold shadow-xs'
+                    : 'text-white/70 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <Truck className="w-[18px] h-[18px] shrink-0 text-center" />
+                <span>Delivery Tracking</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('delivery_history');
+                  if (setIsOpen) setIsOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left ${
+                  activeTab === 'delivery_history'
+                    ? 'bg-white/15 text-white font-semibold shadow-xs'
+                    : 'text-white/70 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <History className="w-[18px] h-[18px] shrink-0 text-center" />
+                <span>Delivery History</span>
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Laboratory & Staff */}
-        {filteredItems.filter((i) => i.category === 'lab').length > 0 && (
-          <div>
-            <div className="px-3 mb-1.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-              {userRole === 'store' ? 'Warehouse Stock' : 'Laboratory & Staff'}
-            </div>
-            <nav className="space-y-1">
-              {filteredItems
-                .filter((item) => item.category === 'lab')
-                .map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg transition-all ${
-                        isActive
-                          ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/20'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                        <span>{item.label}</span>
-                      </div>
-                      {item.badge !== undefined && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${item.badgeColor}`}>
-                          {item.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-            </nav>
+        {/* TOOLS SECTION */}
+        <div>
+          <div className="text-[9.5px] font-bold tracking-widest text-white/30 uppercase px-2.5 py-1.5">
+            Tools
           </div>
-        )}
+          <div className="space-y-0.5">
+            <button
+              onClick={() => {
+                setActiveTab('reports');
+                if (setIsOpen) setIsOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left ${
+                activeTab === 'reports'
+                  ? 'bg-white/15 text-white font-semibold shadow-xs'
+                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <BarChart2 className="w-[18px] h-[18px] shrink-0 text-center" />
+              <span>Reports</span>
+            </button>
 
-        {/* Logistics */}
-        {filteredItems.filter((i) => i.category === 'logistics').length > 0 && (
-          <div>
-            <div className="px-3 mb-1.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-              Supply Chain & Logistics
-            </div>
-            <nav className="space-y-1">
-              {filteredItems
-                .filter((item) => item.category === 'logistics')
-                .map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg transition-all ${
-                        isActive
-                          ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/20'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                        <span>{item.label}</span>
-                      </div>
-                      {item.badge !== undefined && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${item.badgeColor}`}>
-                          {item.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-            </nav>
+            <button
+              onClick={() => {
+                alert('Team Messages & Chat Interface opened.');
+              }}
+              className="w-full flex items-center justify-between px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium transition-colors text-left text-white/70 hover:bg-white/5 hover:text-white"
+            >
+              <div className="flex items-center gap-2.5">
+                <MessageSquare className="w-[18px] h-[18px] shrink-0 text-center" />
+                <span>Messages</span>
+              </div>
+              {unreadMessages > 0 && (
+                <span className="bg-[#e5534b] text-white text-[9px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
+                  {unreadMessages}
+                </span>
+              )}
+            </button>
           </div>
-        )}
-
-        {/* Analytics & Tools */}
-        {filteredItems.filter((i) => i.category === 'analytics').length > 0 && (
-          <div>
-            <div className="px-3 mb-1.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-              Intelligence & Tools
-            </div>
-            <nav className="space-y-1">
-              {filteredItems
-                .filter((item) => item.category === 'analytics')
-                .map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg transition-all ${
-                        isActive
-                          ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/20'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                        <span>{item.label}</span>
-                      </div>
-                      {item.badge !== undefined && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${item.badgeColor}`}>
-                          {item.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-            </nav>
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* Footer system status & Sign out */}
-      <div className="p-3 border-t border-slate-200 bg-slate-50 space-y-2">
-        <button
-          onClick={logout}
-          className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/60 transition-colors cursor-pointer"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          Sign Out
-        </button>
-        <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            GLP Terminal Active
-          </span>
-          <span className="font-mono">v2.4-pharma</span>
+      {/* ACCOUNT / FOOTER SECTION */}
+      <div className="p-2.5 border-t border-white/10 shrink-0">
+        <div className="text-[9.5px] font-bold tracking-widest text-white/30 uppercase px-2.5 pb-1">
+          Account
+        </div>
+        <div className="space-y-0.5">
+          <button
+            onClick={() => {
+              alert('Account Settings & Preferences');
+            }}
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors text-left"
+          >
+            <Settings className="w-[18px] h-[18px] shrink-0 text-center" />
+            <span>Settings</span>
+          </button>
+
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 min-h-[38px] rounded-lg text-[13px] font-medium text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors text-left"
+          >
+            <LogOut className="w-[18px] h-[18px] shrink-0 text-center text-rose-400" />
+            <span>Logout</span>
+          </button>
         </div>
       </div>
     </aside>
   );
 };
-

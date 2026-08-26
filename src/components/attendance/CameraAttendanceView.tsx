@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+// CameraAttendanceView.tsx - Exact 1:1 Implementation matching attendance_camera.php
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { CameraAttendanceLog, AttendanceStatus } from '../../types';
 import { LocationPickerModal } from './LocationPickerModal';
@@ -10,62 +11,87 @@ import {
 import {
   Camera,
   MapPin,
-  Thermometer,
-  Compass,
-  CheckCircle2,
-  AlertCircle,
   RefreshCw,
   Clock,
   ShieldCheck,
-  User,
-  Building2,
-  ZoomIn,
-  Video,
-  VideoOff,
   RotateCw,
   ArrowLeft,
   Send,
   Sliders,
   Check,
-  Sparkles,
   Calendar,
-  Layers,
   Smartphone,
   Maximize2,
-  Info,
-  Navigation,
-  Edit3,
   Radio,
+  Eye,
 } from 'lucide-react';
 
 export const CameraAttendanceView: React.FC = () => {
   const {
     employees,
     cameraLogs,
+    attendanceRecords,
     recordCameraAttendance,
     markAttendance,
     currentUser,
     setActiveTab,
   } = useApp();
 
-  // Find default employee matching current logged in user or fallback to first
-  const initialEmp = employees.find((e) => e.email.toLowerCase() === (currentUser?.email || '').toLowerCase()) || employees[0];
-  const [selectedEmpId, setSelectedEmpId] = useState<number>(initialEmp?.id || 1);
+  const isEmployeeRole = currentUser?.role === 'employee';
+
+  // Automatically find employee matching current logged in user or fallback to first
+  const loggedInEmployee = useMemo(() => {
+    if (!currentUser) return employees[0];
+    return (
+      employees.find((e) => e.email.toLowerCase() === (currentUser.email || '').toLowerCase()) ||
+      employees.find((e) => e.employee_id === currentUser.employee_id) ||
+      employees[0]
+    );
+  }, [employees, currentUser]);
+
+  const [selectedEmpId, setSelectedEmpId] = useState<number>(loggedInEmployee?.id || 1);
+
+  // Keep selectedEmpId locked to the logged-in employee when in employee role
+  useEffect(() => {
+    if (isEmployeeRole && loggedInEmployee) {
+      setSelectedEmpId(loggedInEmployee.id);
+    }
+  }, [isEmployeeRole, loggedInEmployee]);
+
+  // Auto-detect shift type (clock_in vs clock_out) based on today's attendance records
+  const autoDetectShiftType = useCallback((empId: number): 'clock_in' | 'clock_out' => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayLog = attendanceRecords.find(
+      (r) => r.employee_id === empId && r.date === todayStr
+    );
+    if (!todayLog || !todayLog.check_in || todayLog.check_in === '-') {
+      return 'clock_in';
+    }
+    if (todayLog.check_in && (!todayLog.check_out || todayLog.check_out === '-')) {
+      return 'clock_out';
+    }
+    const currentHour = new Date().getHours();
+    return currentHour >= 12 ? 'clock_out' : 'clock_in';
+  }, [attendanceRecords]);
+
   const [attendanceType, setAttendanceType] = useState<'clock_in' | 'clock_out'>('clock_in');
+
+  // Automatically compute shift mode whenever selected employee or attendance records update
+  useEffect(() => {
+    const autoMode = autoDetectShiftType(selectedEmpId);
+    setAttendanceType(autoMode);
+  }, [selectedEmpId, autoDetectShiftType]);
   
-  // Real Device Location & Telemetry State
+  // Real Device Location & Telemetry State (Automatic from GPS & Sensors)
   const [locationAddress, setLocationAddress] = useState('Detecting Device GPS Location...');
   const [temperature, setTemperature] = useState<number>(36.4);
-  const [azimuth, setAzimuth] = useState('NNE (22°)');
+  const [azimuth, setAzimuth] = useState('N 0°');
   const [latitude, setLatitude] = useState<number>(14.599512);
   const [longitude, setLongitude] = useState<number>(120.984222);
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(true);
   const [locationStatus, setLocationStatus] = useState<string>('Syncing Device GPS...');
-  const [locationSource, setLocationSource] = useState<string>('gps');
   const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
-
-  const [notes, setNotes] = useState('Biometric facial verification passed.');
   
   // Camera & Stream State
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
@@ -102,22 +128,8 @@ export const CameraAttendanceView: React.FC = () => {
     setLocationAccuracy(loc.accuracy);
     setLocationAddress(loc.address);
     setLocationStatus(loc.statusText);
-    setLocationSource(loc.source);
     setIsLocating(false);
   }, []);
-
-  // Manual Trigger to re-query Device GPS Location
-  const refreshDeviceLocation = useCallback(async () => {
-    setIsLocating(true);
-    setLocationStatus('Acquiring live satellite coordinates...');
-    try {
-      const loc = await getExactDeviceLocation(8000);
-      handleLocationUpdate(loc);
-    } catch (e) {
-      console.warn('Location query issue:', e);
-      setIsLocating(false);
-    }
-  }, [handleLocationUpdate]);
 
   // Continuous Watch on Device GPS Location
   useEffect(() => {
@@ -130,21 +142,14 @@ export const CameraAttendanceView: React.FC = () => {
     };
   }, [handleLocationUpdate]);
 
-  // Device orientation / compass sensor
+  // Device orientation / compass sensor (Azimuth)
   useEffect(() => {
     const handleOrientation = (e: DeviceOrientationEvent) => {
       if (e.alpha !== null) {
         const deg = Math.round(e.alpha);
-        let cardinal = 'N';
-        if (deg >= 22.5 && deg < 67.5) cardinal = 'NE';
-        else if (deg >= 67.5 && deg < 112.5) cardinal = 'E';
-        else if (deg >= 112.5 && deg < 157.5) cardinal = 'SE';
-        else if (deg >= 157.5 && deg < 202.5) cardinal = 'S';
-        else if (deg >= 202.5 && deg < 247.5) cardinal = 'SW';
-        else if (deg >= 247.5 && deg < 292.5) cardinal = 'W';
-        else if (deg >= 292.5 && deg < 337.5) cardinal = 'NW';
-
-        setAzimuth(`${cardinal} (${deg}°)`);
+        const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+        const index = Math.round(deg / 45) % 8;
+        setAzimuth(`${directions[index]} ${deg}°`);
       }
     };
 
@@ -174,8 +179,8 @@ export const CameraAttendanceView: React.FC = () => {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: mode,
-            width: { ideal: 720 },
-            height: { ideal: 960 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           },
           audio: false,
         });
@@ -190,7 +195,7 @@ export const CameraAttendanceView: React.FC = () => {
       }
     } catch (err: any) {
       console.warn('Camera stream notice:', err?.message || err);
-      setCameraError('Live webcam not accessible in current iframe. Using high-resolution digital scanner simulation.');
+      setCameraError('Camera access not permitted or unavailable in current frame. Biometric fallback simulation ready.');
       setIsCameraActive(false);
     }
   };
@@ -211,17 +216,21 @@ export const CameraAttendanceView: React.FC = () => {
     setFacingMode(nextMode);
   };
 
-  // Generate stamped photo data URL with right location
+  const retryCamera = () => {
+    startCamera(facingMode);
+  };
+
+  // Generate stamped photo data URL with watermark matching attendance_camera.php
   const generateStampedPhoto = (): string => {
     const selectedEmp = employees.find((e) => e.id === Number(selectedEmpId));
     const empName = selectedEmp ? `${selectedEmp.first_name} ${selectedEmp.last_name}` : 'Staff Member';
-    const timeStr = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-    const dateStr = currentTime.toISOString().split('T')[0];
-    const weekdayStr = currentTime.toLocaleDateString([], { weekday: 'long' });
+    const timeStr = currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = currentTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const weekdayStr = currentTime.toLocaleDateString('en-US', { weekday: 'short' });
 
     const canvas = canvasRef.current || document.createElement('canvas');
-    const width = 640;
-    const height = 800;
+    const width = 720;
+    const height = 960;
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
@@ -229,7 +238,7 @@ export const CameraAttendanceView: React.FC = () => {
     if (!ctx) return '';
 
     if (isCameraActive && videoRef.current && videoRef.current.readyState >= 2) {
-      // Draw live video feed
+      // Draw live camera video feed
       ctx.save();
       if (facingMode === 'user') {
         ctx.translate(width, 0);
@@ -238,41 +247,25 @@ export const CameraAttendanceView: React.FC = () => {
       ctx.drawImage(videoRef.current, 0, 0, width, height);
       ctx.restore();
     } else {
-      // High-grade laboratory simulation backdrop
+      // High-resolution Laboratory biometric camera backdrop
       const grad = ctx.createLinearGradient(0, 0, width, height);
       grad.addColorStop(0, '#0a192f');
-      grad.addColorStop(0.5, '#0f2b48');
-      grad.addColorStop(1, '#061325');
+      grad.addColorStop(0.5, '#102a43');
+      grad.addColorStop(1, '#05111f');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 
-      // Tech Grid Pattern
-      ctx.strokeStyle = 'rgba(21, 101, 192, 0.15)';
-      ctx.lineWidth = 1;
-      for (let x = 0; x < width; x += 40) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
-      }
-      for (let y = 0; y < height; y += 40) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
-
-      // Facial Scanning Target Ring
-      ctx.strokeStyle = '#22d3ee';
-      ctx.lineWidth = 3;
+      // Biometric Scanning Ring
+      ctx.strokeStyle = 'rgba(21, 101, 192, 0.4)';
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.arc(width / 2, height / 2 - 40, 110, 0, Math.PI * 2);
+      ctx.arc(width / 2, height / 2 - 30, 110, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Inner Avatar Placeholder
-      ctx.fillStyle = '#0e7490';
+      // Avatar circle
+      ctx.fillStyle = '#1565C0';
       ctx.beginPath();
-      ctx.arc(width / 2, height / 2 - 40, 95, 0, Math.PI * 2);
+      ctx.arc(width / 2, height / 2 - 30, 95, 0, Math.PI * 2);
       ctx.fill();
 
       // Avatar Initials
@@ -280,17 +273,31 @@ export const CameraAttendanceView: React.FC = () => {
       ctx.font = 'bold 44px sans-serif';
       ctx.textAlign = 'center';
       const initials = selectedEmp ? `${selectedEmp.first_name[0]}${selectedEmp.last_name[0]}` : 'MC';
-      ctx.fillText(initials, width / 2, height / 2 - 25);
+      ctx.fillText(initials, width / 2, height / 2 - 15);
 
       ctx.font = 'bold 20px sans-serif';
-      ctx.fillText(empName, width / 2, height / 2 + 105);
-
+      ctx.fillText(empName, width / 2, height / 2 + 110);
       ctx.font = '14px sans-serif';
-      ctx.fillStyle = '#67e8f9';
-      ctx.fillText(`${selectedEmp?.department || 'Laboratory'} • ${selectedEmp?.position || 'Chemist'}`, width / 2, height / 2 + 130);
+      ctx.fillStyle = '#90CAF9';
+      ctx.fillText(`${selectedEmp?.department || 'Laboratory'} • ${selectedEmp?.employee_id || ''}`, width / 2, height / 2 + 135);
     }
 
-    // ── WATERMARK HUD OVERLAY (Authentic McPILLAB Standard) ──
+    // ── TOP-RIGHT McPILLAB BADGE (Exact match with attendance_camera.php) ──
+    const logoText = 'McPILLAB';
+    const logoBoxWidth = 140;
+    const logoBoxHeight = 32;
+    const logoX = width - logoBoxWidth - 20;
+    const logoY = 24;
+
+    ctx.fillStyle = 'rgba(21, 101, 192, 0.9)';
+    ctx.fillRect(logoX, logoY, logoBoxWidth, logoBoxHeight);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(logoText, logoX + logoBoxWidth / 2, logoY + 22);
+
+    // ── WATERMARK OVERLAY (Exact match with attendance_camera.php) ──
     const overlayX = 24;
     const overlayY = 40;
 
@@ -298,27 +305,28 @@ export const CameraAttendanceView: React.FC = () => {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 20px sans-serif';
-    ctx.shadowColor = 'rgba(0,0,0,0.9)';
+    ctx.shadowColor = 'rgba(0,0,0,0.95)';
     ctx.shadowBlur = 6;
     ctx.shadowOffsetX = 1;
     ctx.shadowOffsetY = 1;
 
-    ctx.fillText(`◆ ${attendanceType === 'clock_in' ? 'Clock In Verification' : 'Clock Out Verification'}`, overlayX, overlayY);
+    const overlayTitle = attendanceType === 'clock_in' ? 'Clock In' : 'Clock Out';
+    ctx.fillText(`◆ ${overlayTitle}`, overlayX, overlayY);
 
     // Dashed line
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
     ctx.beginPath();
-    ctx.moveTo(overlayX, overlayY + 10);
-    ctx.lineTo(overlayX + 300, overlayY + 10);
+    ctx.moveTo(overlayX, overlayY + 12);
+    ctx.lineTo(overlayX + 220, overlayY + 12);
     ctx.stroke();
-    ctx.setLineDash([]); // reset
+    ctx.setLineDash([]);
 
-    // Info lines
-    let currentY = overlayY + 34;
+    // Watermark lines
+    let currentY = overlayY + 36;
     const lineHeight = 22;
-    ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.font = 'bold 13px sans-serif';
     ctx.fillStyle = '#ffffff';
 
     ctx.fillText(`◆ Time: ${timeStr}`, overlayX, currentY);
@@ -327,34 +335,35 @@ export const CameraAttendanceView: React.FC = () => {
     ctx.fillText(`◆ Date: ${dateStr} ${weekdayStr}`, overlayX, currentY);
     currentY += lineHeight;
 
-    // Clean truncated location line for stamp
-    const displayLoc = locationAddress.length > 45 ? `${locationAddress.substring(0, 42)}...` : locationAddress;
+    const displayLoc = locationAddress.length > 40 ? `${locationAddress.substring(0, 37)}...` : locationAddress;
     ctx.fillText(`◆ Location: ${displayLoc}`, overlayX, currentY);
     currentY += lineHeight;
 
     ctx.fillText(`◆ Azimuth: ${azimuth}`, overlayX, currentY);
     currentY += lineHeight;
 
-    ctx.fillText(`◆ Coordinate: ${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E`, overlayX, currentY);
+    const latStr = `${Math.abs(latitude).toFixed(6)}°${latitude >= 0 ? 'N' : 'S'}`;
+    const lonStr = `${Math.abs(longitude).toFixed(6)}°${longitude >= 0 ? 'E' : 'W'}`;
+    ctx.fillText(`◆ Coordinate: ${latStr}, ${lonStr}`, overlayX, currentY);
     currentY += lineHeight;
 
-    ctx.fillText(`◆ Temperature: ${temperature.toFixed(1)}°C (Normal)`, overlayX, currentY);
-    currentY += lineHeight + 4;
+    ctx.fillText(`◆ Temperature: ${temperature.toFixed(1)}°C`, overlayX, currentY);
+    currentY += lineHeight + 6;
 
-    // Shield verification badge
+    // Shield verification line
     ctx.font = '600 12px sans-serif';
-    ctx.fillStyle = '#6ee7b7';
+    ctx.fillStyle = '#ffffff';
     ctx.fillText(`✓ Time & location verified by McPILLAB APP`, overlayX, currentY);
 
     // Reset shadow
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
 
-    return canvas.toDataURL('image/jpeg', 0.9);
+    return canvas.toDataURL('image/jpeg', 0.92);
   };
 
   // Trigger shutter capture
-  const handleShutterClick = () => {
+  const handleCapture = () => {
     setFlashActive(true);
     setIsProcessing(true);
 
@@ -363,11 +372,11 @@ export const CameraAttendanceView: React.FC = () => {
       const photoUrl = generateStampedPhoto();
       setPreviewPhotoUrl(photoUrl);
       setIsProcessing(false);
-    }, 200);
+    }, 180);
   };
 
-  // Confirm and save attendance
-  const confirmAndSubmitAttendance = () => {
+  // Confirm and submit attendance
+  const confirmPhoto = () => {
     if (!previewPhotoUrl) return;
 
     const selectedEmp = employees.find((e) => e.id === Number(selectedEmpId));
@@ -385,7 +394,7 @@ export const CameraAttendanceView: React.FC = () => {
       status = 'late';
     }
 
-    // 1. Record camera attendance entry with correct location
+    // 1. Record camera attendance entry
     recordCameraAttendance({
       employee_id: Number(selectedEmpId),
       employee_name: empName,
@@ -398,10 +407,10 @@ export const CameraAttendanceView: React.FC = () => {
       azimuth,
       temperature,
       device_info: `${navigator.userAgent.substring(0, 35)} (Verified McPILLAB Biometric)`,
-      notes: `${attendanceType === 'clock_in' ? 'Morning Shift Clock-In' : 'Evening Shift Clock-Out'} at ${locationAddress}.`,
+      notes: `${attendanceType === 'clock_in' ? 'Clock In' : 'Clock Out'} at ${locationAddress}.`,
     });
 
-    // 2. Also record / update general attendance timesheet with location
+    // 2. Also record / update general attendance timesheet
     markAttendance({
       employee_id: Number(selectedEmpId),
       employee_name: empName,
@@ -418,7 +427,7 @@ export const CameraAttendanceView: React.FC = () => {
 
     setPreviewPhotoUrl(null);
     setSuccessToast(`Attendance recorded at ${locationAddress} for ${empName}! Status: ${status.toUpperCase()} (${formattedDisplayTime})`);
-    setTimeout(() => setSuccessToast(null), 6000);
+    setTimeout(() => setSuccessToast(null), 5000);
   };
 
   const retakePhoto = () => {
@@ -428,53 +437,41 @@ export const CameraAttendanceView: React.FC = () => {
   const selectedEmployeeObj = employees.find((e) => e.id === Number(selectedEmpId)) || employees[0];
 
   return (
-    <div className="space-y-6">
-      {/* Top Header & Mode Toggle Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Top Bar / Navigation Header */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900">Biometric Camera Attendance Terminal</h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-              Live Scanner Active
+          <h1 className="text-lg font-black text-slate-900 flex items-center gap-2">
+            <span>Camera Attendance Terminal</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+              {isCameraActive ? 'Rear/Front Live' : 'Biometric Ready'}
             </span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Official McPILLAB camera attendance station with facial watermark stamp, GPS geofencing, and thermal telemetry.
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Real-time biometric attendance capture with GPS location, azimuth telemetry, and verified watermark stamp.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Quick Location Action Button */}
-          <button
-            onClick={() => setShowLocationModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-xs rounded-xl border border-teal-200 transition-colors shadow-xs"
-            title="Configure / Detect Location"
-          >
-            <MapPin className="w-3.5 h-3.5 text-teal-600" />
-            <span className="hidden sm:inline">Location:</span>
-            <span className="truncate max-w-[120px] font-semibold">{locationAddress.split(',')[0]}</span>
-            <Edit3 className="w-3 h-3 text-teal-600 ml-0.5" />
-          </button>
-
-          {/* Sub Tab Switcher */}
+          {/* SubTab Toggle */}
           <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
             <button
               onClick={() => setActiveSubTab('camera')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 activeSubTab === 'camera'
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-[#1565C0] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Camera className="w-3.5 h-3.5" />
-              Viewfinder
+              Camera
             </button>
             <button
               onClick={() => setActiveSubTab('history')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 activeSubTab === 'history'
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-[#1565C0] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -483,55 +480,46 @@ export const CameraAttendanceView: React.FC = () => {
             </button>
           </div>
 
-          {/* View Mode Toggle (Phone frame vs side-by-side) */}
+          {/* View Mode Toggle */}
           <button
             onClick={() => setViewMode(viewMode === 'phone' ? 'split' : 'phone')}
             className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors"
-            title={viewMode === 'phone' ? 'Switch to Full Terminal Mode' : 'Switch to Mobile Phone View'}
+            title={viewMode === 'phone' ? 'Expand View' : 'Phone Shell View'}
           >
             {viewMode === 'phone' ? <Maximize2 className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
-      {/* Success Notification Banner */}
+      {/* Success Notification Alert */}
       {successToast && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in">
-          <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-              <Check className="w-4 h-4" />
-            </div>
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-bold flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span>{successToast}</span>
           </div>
-          <button
-            onClick={() => setSuccessToast(null)}
-            className="text-emerald-700 hover:text-emerald-900 font-extrabold text-xs"
-          >
-            Dismiss
-          </button>
+          <button onClick={() => setSuccessToast(null)} className="text-emerald-700 font-extrabold">✕</button>
         </div>
       )}
 
-      {/* SubTab 1: Camera Interface */}
+      {/* SubTab 1: Camera Terminal (Exact 1:1 Implementation of attendance_camera.php) */}
       {activeSubTab === 'camera' && (
         <div className={`grid grid-cols-1 ${viewMode === 'split' ? 'lg:grid-cols-12' : ''} gap-6 items-start justify-center`}>
           
-          {/* CENTER: The Phone Viewfinder Terminal */}
-          <div className={`${viewMode === 'split' ? 'lg:col-span-7' : 'max-w-md mx-auto w-full'} flex justify-center`}>
-            
-            {/* Phone Bezel Frame */}
-            <div className="w-full max-w-[390px] h-[780px] bg-black rounded-[40px] p-3 shadow-2xl border-4 border-slate-800 relative flex flex-col overflow-hidden select-none">
+          {/* PHONE SHELL & FRAME */}
+          <div className={`${viewMode === 'split' ? 'lg:col-span-7' : 'max-w-[400px] mx-auto w-full'} flex justify-center`}>
+            <div className="w-full max-w-[390px] h-[780px] bg-black rounded-[42px] p-3 shadow-2xl border-4 border-slate-800 relative flex flex-col overflow-hidden select-none">
               
-              {/* Dynamic Island / Top Speaker Notch */}
+              {/* Dynamic Island / Notch */}
               <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-4 bg-slate-900 rounded-full z-40 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-slate-950 border border-slate-800 mr-2"></div>
-                <div className="w-2 h-2 rounded-full bg-blue-900/60"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-slate-950 border border-slate-800 mr-2"></div>
+                <div className="w-2 h-2 rounded-full bg-blue-900/80"></div>
               </div>
 
-              {/* Viewfinder Main Stage */}
-              <div className="relative flex-1 rounded-[32px] overflow-hidden bg-slate-950 flex flex-col justify-between">
+              {/* Viewfinder Main Frame */}
+              <div className="relative flex-1 rounded-[32px] overflow-hidden bg-[#0a101f] flex flex-col justify-between">
                 
-                {/* Background Video Stream (or Simulation Fallback) */}
+                {/* Real Camera Stream or Biometric Fallback */}
                 {isCameraActive ? (
                   <video
                     ref={videoRef}
@@ -543,155 +531,180 @@ export const CameraAttendanceView: React.FC = () => {
                     }`}
                   />
                 ) : (
-                  <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-blue-950 flex flex-col items-center justify-center p-6 text-center z-0">
-                    <div className="w-28 h-28 rounded-full border-2 border-cyan-400/50 flex items-center justify-center mb-3 animate-pulse bg-cyan-950/20">
-                      <div className="w-20 h-20 rounded-full bg-cyan-700/40 flex items-center justify-center text-white text-2xl font-bold">
+                  <div className="absolute inset-0 bg-gradient-to-b from-[#0d1b3e] via-[#102a5e] to-[#0a101f] flex flex-col items-center justify-center p-6 text-center z-0">
+                    <div className="w-28 h-28 rounded-full border-3 border-[#1565C0] flex items-center justify-center mb-3 shadow-lg shadow-[#1565C0]/40 bg-[#1565C0]/20">
+                      <div className="w-20 h-20 rounded-full bg-[#1565C0] flex items-center justify-center text-white text-2xl font-black">
                         {selectedEmployeeObj.first_name[0]}{selectedEmployeeObj.last_name[0]}
                       </div>
                     </div>
-                    <p className="text-white font-bold text-sm">
+                    <p className="text-white font-bold text-base">
                       {selectedEmployeeObj.first_name} {selectedEmployeeObj.last_name}
                     </p>
-                    <p className="text-xs text-blue-300 mt-0.5">
-                      {selectedEmployeeObj.department} • {selectedEmployeeObj.employee_id}
+                    <p className="text-xs text-blue-300 font-medium mt-0.5">
+                      {selectedEmployeeObj.department} &bull; {selectedEmployeeObj.employee_id}
                     </p>
-                    <p className="text-[11px] text-slate-400 mt-2 max-w-[220px]">
-                      Biometric facial scanner ready. Tap the shutter button below to record attendance.
-                    </p>
+                    <div className="mt-3 px-3 py-1 bg-white/10 rounded-full text-[11px] text-slate-200 border border-white/10 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+                      <span>Ready for Camera Attendance</span>
+                    </div>
                   </div>
                 )}
 
-                {/* Shutter Flash Animation */}
+                {/* STATUS BAR (Status time, Signal bars, WiFi, Battery) */}
+                <div className="relative z-30 pt-3 px-5 flex items-center justify-between text-white text-[12px] font-semibold select-none drop-shadow-md">
+                  <span>{currentTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                  <div className="flex items-center gap-1.5 opacity-90">
+                    {/* Signal bars */}
+                    <div className="flex items-end gap-0.5 h-2.5">
+                      <div className="w-0.5 h-1 bg-white rounded-2xs"></div>
+                      <div className="w-0.5 h-1.5 bg-white rounded-2xs"></div>
+                      <div className="w-0.5 h-2 bg-white rounded-2xs"></div>
+                      <div className="w-0.5 h-2.5 bg-white rounded-2xs"></div>
+                    </div>
+                    {/* WiFi icon */}
+                    <Radio className="w-3 h-3 text-white" />
+                    {/* Battery */}
+                    <div className="w-4 h-2 rounded-[2px] border border-white flex items-center p-0.5">
+                      <div className="w-2.5 h-full bg-[#4CD964] rounded-2xs"></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* FLASH OVERLAY */}
                 <div
                   className={`absolute inset-0 bg-white transition-opacity duration-100 pointer-events-none z-50 ${
                     flashActive ? 'opacity-90' : 'opacity-0'
                   }`}
                 ></div>
 
-                {/* Top Action Bar Inside Camera (Back & Camera Switch) */}
-                <div className="relative z-20 flex items-center justify-between p-3">
+                {/* TOP ACTION BUTTONS (Back Button, Retry Button, Switch Camera, McPILLAB Logo) */}
+                <div className="relative z-20 flex items-center justify-between px-3 pt-1">
                   <button
                     onClick={() => setActiveTab('attendance')}
-                    className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/60 transition-colors"
-                    title="Back to Timesheets"
+                    className="w-9 h-9 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/70 transition-colors border border-white/15"
+                    title="Back"
                   >
                     <ArrowLeft className="w-4 h-4" />
                   </button>
 
                   <div className="flex items-center gap-2">
-                    {/* Location Pin Trigger inside Camera */}
-                    <button
-                      onClick={() => setShowLocationModal(true)}
-                      className="px-2.5 py-1 rounded-full bg-teal-900/60 backdrop-blur-md border border-teal-400/40 text-teal-200 flex items-center gap-1 hover:bg-teal-800/80 transition-colors text-[11px] font-bold"
-                      title="Select or Verify Location"
-                    >
-                      <MapPin className="w-3 h-3 text-teal-300" />
-                      <span>Location</span>
-                    </button>
+                    {/* McPILLAB Badge */}
+                    <div className="px-2.5 py-1 bg-[#1565C0] border border-blue-400/40 rounded-md text-white text-[11px] font-black tracking-wider shadow-sm">
+                      McPILLAB
+                    </div>
 
+                    {/* Switch Camera */}
                     <button
                       onClick={toggleCameraFacing}
-                      className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/60 transition-colors"
-                      title="Switch Camera (Front/Back)"
+                      className="w-9 h-9 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/70 transition-colors border border-white/15"
+                      title="Switch Camera (Front/Rear)"
                     >
                       <RotateCw className="w-4 h-4" />
                     </button>
+
+                    {/* Retry Camera */}
                     <button
-                      onClick={() => startCamera(facingMode)}
-                      className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/60 transition-colors"
-                      title="Reload Stream"
+                      onClick={retryCamera}
+                      className="w-9 h-9 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/70 transition-colors border border-white/15"
+                      title="Retry Camera"
                     >
                       <RefreshCw className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Authentic Watermark HUD Overlay */}
+                {/* WATERMARK OVERLAY (Exact match with attendance_camera.php) */}
                 <div className="relative z-20 px-4 py-2 pointer-events-none">
                   {/* Clickable Header for Attendance Type */}
                   <div
                     onClick={() => setShowOptionsPanel(!showOptionsPanel)}
-                    className="pointer-events-auto cursor-pointer inline-flex items-center gap-1.5 text-white font-extrabold text-base drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] hover:opacity-90 transition-opacity"
+                    className="pointer-events-auto cursor-pointer inline-flex items-center gap-1.5 text-white font-black text-[16px] drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] hover:opacity-90 transition-opacity"
                   >
                     <span className="text-white text-xs">◆</span>
-                    <span>{attendanceType === 'clock_in' ? 'Clock In' : 'Clock Out'} Attendance</span>
+                    <span>{attendanceType === 'clock_in' ? 'Clock In' : 'Clock Out'}</span>
                     <Sliders className="w-3.5 h-3.5 text-blue-300 ml-1" />
                   </div>
 
-                  <div className="w-44 border-t-2 border-dashed border-white/70 my-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"></div>
+                  <div className="w-48 border-t-2 border-dashed border-white/75 my-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"></div>
 
-                  <div className="space-y-0.5 text-white text-xs font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+                  <div className="space-y-0.5 text-white text-[11.5px] font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-white text-[10px]">◆</span>
-                      <span>Time: {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</span>
+                      <span className="text-white text-[9px]">◆</span>
+                      <span>Time: {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-white text-[10px]">◆</span>
-                      <span>Date: {currentTime.toISOString().split('T')[0]} {currentTime.toLocaleDateString([], { weekday: 'long' })}</span>
+                      <span className="text-white text-[9px]">◆</span>
+                      <span>Date: {currentTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} {currentTime.toLocaleDateString('en-US', { weekday: 'short' })}</span>
                     </div>
 
-                    {/* Interactive Location Line in HUD */}
+                    {/* Interactive Location */}
                     <div
                       onClick={() => setShowLocationModal(true)}
                       className="pointer-events-auto cursor-pointer flex items-center gap-1.5 group hover:text-teal-200 transition-colors"
-                      title="Click to change or verify location"
+                      title="Click to select / verify location"
                     >
-                      <span className="text-white text-[10px]">◆</span>
-                      <span className="truncate max-w-[260px] underline decoration-teal-400 decoration-dotted underline-offset-2">
+                      <span className="text-white text-[9px]">◆</span>
+                      <span className="truncate max-w-[250px] underline decoration-teal-400 decoration-dotted underline-offset-2">
                         Location: {locationAddress}
                       </span>
-                      <Edit3 className="w-3 h-3 text-teal-300 opacity-80 group-hover:opacity-100 shrink-0" />
+                      <MapPin className="w-3 h-3 text-teal-300 opacity-80 group-hover:opacity-100 shrink-0" />
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-white text-[10px]">◆</span>
+                      <span className="text-white text-[9px]">◆</span>
                       <span>Azimuth: {azimuth}</span>
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-white text-[10px]">◆</span>
-                      <span>Coordinate: {latitude.toFixed(4)}°N, {longitude.toFixed(4)}°E</span>
+                      <span className="text-white text-[9px]">◆</span>
+                      <span>Coordinate: {Math.abs(latitude).toFixed(6)}°{latitude >= 0 ? 'N' : 'S'}, {Math.abs(longitude).toFixed(6)}°{longitude >= 0 ? 'E' : 'W'}</span>
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-white text-[10px]">◆</span>
+                      <span className="text-white text-[9px]">◆</span>
                       <span>Temperature: {temperature.toFixed(1)}°C</span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-emerald-300 pt-1 text-[11px]">
-                      <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-white pt-1 text-[11px] font-semibold">
+                      <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-white" />
                       <span>Time & location verified by McPILLAB APP</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Dropdown Options Panel for Clock-In / Clock-Out */}
+                {/* ATTENDANCE OPTIONS PANEL (Toggleable on tap) */}
                 {showOptionsPanel && (
-                  <div className="absolute inset-x-3 top-16 bg-slate-900/95 backdrop-blur-md rounded-2xl p-4 border border-white/20 z-40 text-white shadow-2xl animate-in fade-in">
-                    <div className="flex items-center justify-between pb-2 mb-3 border-b border-white/10">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-blue-400">
-                        <Clock className="w-4 h-4" />
-                        <span>Shift Attendance Mode</span>
+                  <div className="absolute inset-x-3 top-16 bg-[#1a1a2e]/95 backdrop-blur-md rounded-2xl p-4 border border-white/20 z-40 text-white shadow-2xl animate-in fade-in">
+                    {/* Time indicator */}
+                    <div className="bg-[#1565C0]/20 rounded-xl p-3 mb-3 border-l-4 border-[#1565C0] flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-blue-400" />
+                        <div>
+                          <div className="text-[10px] text-slate-300 font-semibold uppercase">Current Time</div>
+                          <div className="text-sm font-bold text-white">
+                            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </div>
+                        </div>
                       </div>
                       <button
                         onClick={() => setShowOptionsPanel(false)}
                         className="text-xs text-slate-400 hover:text-white"
                       >
-                        Close ✕
+                        ✕
                       </button>
                     </div>
 
-                    {/* Shift Schedule Alert */}
-                    <div className="bg-slate-800/80 rounded-xl p-2.5 mb-3 text-[11px] border border-slate-700">
-                      <span className="text-slate-400 block font-semibold mb-1">Standard Work Schedule:</span>
+                    {/* Shift Schedule */}
+                    <div className="bg-white/5 rounded-xl p-2.5 mb-3 text-[11px] border border-white/10">
+                      <div className="font-bold text-slate-200 mb-1">Work Schedule:</div>
                       <div className="flex justify-between text-slate-300">
                         <span>🌅 8:00 AM - 12:00 PM</span>
                         <span>🌤️ 1:00 PM - 5:00 PM</span>
                       </div>
                     </div>
 
-                    {/* Clock In Option */}
+                    {/* Clock In */}
                     <div
                       onClick={() => {
                         setAttendanceType('clock_in');
@@ -699,12 +712,12 @@ export const CameraAttendanceView: React.FC = () => {
                       }}
                       className={`p-3 rounded-xl mb-2 flex items-center justify-between cursor-pointer border transition-all ${
                         attendanceType === 'clock_in'
-                          ? 'bg-blue-600/30 border-blue-500 text-white'
-                          : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
+                          ? 'bg-[#1565C0]/30 border-[#1565C0] text-white'
+                          : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+                        <div className="w-9 h-9 rounded-full bg-[#1565C0] text-white flex items-center justify-center font-bold">
                           🌅
                         </div>
                         <div>
@@ -715,7 +728,7 @@ export const CameraAttendanceView: React.FC = () => {
                       {attendanceType === 'clock_in' && <Check className="w-4 h-4 text-blue-400" />}
                     </div>
 
-                    {/* Clock Out Option */}
+                    {/* Clock Out */}
                     <div
                       onClick={() => {
                         setAttendanceType('clock_out');
@@ -723,12 +736,12 @@ export const CameraAttendanceView: React.FC = () => {
                       }}
                       className={`p-3 rounded-xl flex items-center justify-between cursor-pointer border transition-all ${
                         attendanceType === 'clock_out'
-                          ? 'bg-orange-600/30 border-orange-500 text-white'
-                          : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
+                          ? 'bg-[#e65100]/30 border-[#e65100] text-white'
+                          : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold">
+                        <div className="w-9 h-9 rounded-full bg-[#e65100] text-white flex items-center justify-center font-bold">
                           🌤️
                         </div>
                         <div>
@@ -741,170 +754,116 @@ export const CameraAttendanceView: React.FC = () => {
                   </div>
                 )}
 
-                {/* Bottom Bar: Large Shutter Button */}
-                <div className="relative z-20 py-4 flex items-center justify-center bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                {/* BOTTOM BAR: LARGE SHUTTER BUTTON (70x70px, #1565C0, glow shadow) */}
+                <div className="relative z-20 py-5 flex items-center justify-center bg-transparent">
                   <button
-                    onClick={handleShutterClick}
+                    onClick={handleCapture}
                     disabled={isProcessing}
-                    className="w-18 h-18 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-90 text-white flex items-center justify-center shadow-lg shadow-blue-600/50 border-4 border-white/80 transition-transform cursor-pointer"
-                    title="Capture Biometric Attendance"
+                    className="w-[70px] h-[70px] rounded-full bg-[#1565C0] hover:bg-[#0d47a1] active:scale-95 text-white flex items-center justify-center shadow-[0_0_0_6px_rgba(21,101,192,0.25)] border-4 border-[#1565C0] transition-transform cursor-pointer"
+                    title="Capture Attendance Photo"
                   >
-                    <Camera className="w-8 h-8 text-white drop-shadow" />
+                    <Camera className="w-7 h-7 text-white" />
                   </button>
                 </div>
               </div>
 
-              {/* Home Indicator bar */}
+              {/* Bottom Home Indicator */}
               <div className="w-32 h-1 bg-white/40 rounded-full mx-auto my-2"></div>
             </div>
           </div>
 
-          {/* RIGHT: Staff Selector & Telemetry Station Controls (for Split View Mode) */}
-          <div className={`${viewMode === 'split' ? 'lg:col-span-5' : 'max-w-md mx-auto w-full'} bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4`}>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-blue-600" />
-                <h2 className="text-sm font-bold text-slate-900">Attendance Station Settings</h2>
+          {/* TELEMETRY & CONTROLS (for Desktop Split Mode) */}
+          {viewMode === 'split' && (
+            <div className="lg:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-[#1565C0]" />
+                  <h2 className="text-sm font-bold text-slate-900">
+                    {isEmployeeRole ? 'Employee Biometric Station' : 'Attendance Configuration'}
+                  </h2>
+                </div>
+                <span className="text-[10px] font-mono bg-blue-50 text-[#1565C0] px-2 py-0.5 rounded font-bold border border-blue-200">
+                  LIVE GPS
+                </span>
               </div>
-              <span className="text-[10px] font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-600">
-                MC-CAM-01
-              </span>
-            </div>
 
-            {/* Select Employee */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-blue-600" />
-                Employee Checking In / Out
-              </label>
-              <select
-                value={selectedEmpId}
-                onChange={(e) => setSelectedEmpId(Number(e.target.value))}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-blue-500"
+              {/* Employee Information */}
+              <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#1565C0] text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                  {selectedEmployeeObj.first_name[0]}{selectedEmployeeObj.last_name[0]}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900">
+                    {selectedEmployeeObj.first_name} {selectedEmployeeObj.last_name}
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    {selectedEmployeeObj.department} &bull; {selectedEmployeeObj.employee_id}
+                  </div>
+                </div>
+              </div>
+
+              {/* Shift Attendance Mode */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">Shift Attendance Mode</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceType('clock_in')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                      attendanceType === 'clock_in'
+                        ? 'bg-blue-50 border-[#1565C0] text-[#1565C0] shadow-xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>🌅</span> Clock In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceType('clock_out')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                      attendanceType === 'clock_out'
+                        ? 'bg-orange-50 border-orange-500 text-orange-700 shadow-xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>🌤️</span> Clock Out
+                  </button>
+                </div>
+              </div>
+
+              {/* Location telemetry */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-teal-600" /> GPS Geofenced Location
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowLocationModal(true)}
+                    className="text-[11px] font-bold text-[#1565C0] hover:underline"
+                  >
+                    Change / Verify
+                  </button>
+                </div>
+                <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-800">
+                  {locationAddress}
+                </div>
+                <div className="text-[10px] text-slate-500 flex justify-between">
+                  <span>{locationStatus}</span>
+                  <span className="font-mono">{latitude.toFixed(4)}°N, {longitude.toFixed(4)}°E</span>
+                </div>
+              </div>
+
+              {/* Capture Trigger */}
+              <button
+                onClick={handleCapture}
+                className="w-full py-3 bg-[#1565C0] hover:bg-[#0d47a1] text-white font-black text-xs rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.first_name} {emp.last_name} ({emp.employee_id} • {emp.department})
-                  </option>
-                ))}
-              </select>
+                <Camera className="w-4 h-4" />
+                Capture Attendance Snapshot
+              </button>
             </div>
-
-            {/* Attendance Mode Radio Switch */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-blue-600" />
-                Shift Mode
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAttendanceType('clock_in')}
-                  className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                    attendanceType === 'clock_in'
-                      ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-xs'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>🌅</span> Clock In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAttendanceType('clock_out')}
-                  className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                    attendanceType === 'clock_out'
-                      ? 'bg-orange-50 border-orange-500 text-orange-700 shadow-xs'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>🌤️</span> Clock Out
-                </button>
-              </div>
-            </div>
-
-            {/* Station Location with Pinpoint / Change Action */}
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-teal-600" />
-                  Verified Attendance Location
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowLocationModal(true)}
-                  className="text-[11px] font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-teal-200 shadow-2xs"
-                >
-                  <Navigation className="w-3 h-3 text-teal-600" />
-                  Change / Pinpoint
-                </button>
-              </div>
-
-              <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-800">
-                {locationAddress}
-              </div>
-
-              <div className="flex items-center justify-between text-[10px] text-slate-500">
-                <span className="flex items-center gap-1">
-                  <span className={`w-2 h-2 rounded-full ${isLocating ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'}`} />
-                  {locationStatus}
-                </span>
-                <span className="font-mono">
-                  {latitude.toFixed(4)}°N, {longitude.toFixed(4)}°E
-                  {locationAccuracy ? ` (±${locationAccuracy}m)` : ''}
-                </span>
-              </div>
-            </div>
-
-            {/* Telemetry Grid: Temp & Azimuth */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                  <Thermometer className="w-3.5 h-3.5 text-rose-500" />
-                  Body Temp (°C)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={temperature}
-                  onChange={(e) => setTemperature(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                  <Compass className="w-3.5 h-3.5 text-blue-500" />
-                  Azimuth
-                </label>
-                <input
-                  type="text"
-                  value={azimuth}
-                  onChange={(e) => setAzimuth(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">Verification Notes</label>
-              <input
-                type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none"
-              />
-            </div>
-
-            {/* Direct Trigger Button */}
-            <button
-              onClick={handleShutterClick}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 active:scale-98 transition-all"
-            >
-              <Camera className="w-4 h-4" />
-              Capture Attendance Snapshot
-            </button>
-          </div>
+          )}
         </div>
       )}
 
@@ -912,7 +871,7 @@ export const CameraAttendanceView: React.FC = () => {
       {activeSubTab === 'history' && (
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900">Recent Biometric Attendance Captures</h2>
+            <h2 className="text-sm font-bold text-slate-900">Biometric Attendance Logs</h2>
             <span className="text-xs text-slate-500">{cameraLogs.length} Verified Entries</span>
           </div>
 
@@ -937,7 +896,7 @@ export const CameraAttendanceView: React.FC = () => {
                       onClick={() => setSelectedPhotoModal(log)}
                       className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded text-white text-[10px] font-bold flex items-center gap-1 hover:bg-black/80"
                     >
-                      <ZoomIn className="w-3 h-3" /> Zoom
+                      <Eye className="w-3 h-3" /> View Proof
                     </button>
                   </div>
 
@@ -952,10 +911,6 @@ export const CameraAttendanceView: React.FC = () => {
                       <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                       <span className="truncate">{log.location_address}</span>
                     </div>
-                    <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1 pt-1 border-t border-slate-200/60">
-                      <span>Temp: {log.temperature || '36.4'}°C</span>
-                      <span>Az: {log.azimuth}</span>
-                    </div>
                   </div>
                 </div>
               ))}
@@ -964,62 +919,39 @@ export const CameraAttendanceView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 1: Photo Preview & Verification Confirmation */}
+      {/* PREVIEW MODAL (Exact match with attendance_camera.php preview-modal) */}
       {previewPhotoUrl && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-slate-900 text-white rounded-3xl max-w-md w-full p-5 border border-white/10 shadow-2xl space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-sm font-bold">Attendance Preview & Verification</h3>
-              </div>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-600/40 text-blue-300 border border-blue-400/40">
-                {attendanceType === 'clock_in' ? 'CLOCK IN' : 'CLOCK OUT'}
-              </span>
-            </div>
-
-            {/* Photo with HUD Stamp */}
-            <div className="relative aspect-4/3 rounded-2xl overflow-hidden bg-black border border-white/20">
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xs flex flex-col items-center justify-center p-4">
+          <div className="max-w-md w-full flex flex-col items-center space-y-4 animate-in zoom-in-95">
+            {/* Captured Stamped Photo */}
+            <div className="w-full max-h-[66vh] rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-black">
               <img
                 src={previewPhotoUrl}
-                alt="Captured Snapshot"
-                className="w-full h-full object-cover"
+                alt="Attendance Preview"
+                className="w-full h-auto max-h-[66vh] object-contain block mx-auto"
               />
             </div>
 
-            <div className="bg-slate-800/80 p-3 rounded-xl text-xs space-y-1.5 border border-slate-700">
-              <div className="text-slate-300">
-                Staff: <span className="font-bold text-white">{selectedEmployeeObj.first_name} {selectedEmployeeObj.last_name}</span>
-              </div>
-              <div className="text-slate-300">
-                Timestamp: <span className="font-mono text-emerald-400">{currentTime.toLocaleTimeString()}</span> ({currentTime.toISOString().split('T')[0]})
-              </div>
-              <div className="text-teal-300 text-[11px] flex items-start gap-1">
-                <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span>Verified Location: <strong className="text-white">{locationAddress}</strong></span>
-              </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Action Buttons (.btn-send and .btn-retake) */}
+            <div className="flex items-center gap-3 w-full justify-center pt-2">
               <button
-                onClick={retakePhoto}
-                className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-600 flex items-center justify-center gap-1.5 transition-colors"
+                onClick={confirmPhoto}
+                className="px-6 py-3 bg-[#1565C0] hover:bg-[#0d47a1] text-white font-bold text-sm rounded-full flex items-center gap-2 shadow-lg shadow-[#1565C0]/40 transition-transform active:scale-95 cursor-pointer"
               >
-                <RotateCw className="w-3.5 h-3.5" /> Retake Photo
+                <Send className="w-4 h-4" /> Send Attendance
               </button>
               <button
-                onClick={confirmAndSubmitAttendance}
-                className="py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-1.5 transition-all"
+                onClick={retakePhoto}
+                className="px-5 py-3 bg-white/15 hover:bg-white/25 text-white font-bold text-sm rounded-full flex items-center gap-2 border border-white/20 transition-colors cursor-pointer"
               >
-                <Send className="w-3.5 h-3.5" /> Send Attendance
+                <RotateCw className="w-4 h-4" /> Retake
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL 2: Zoomed Photo Modal */}
+      {/* ZOOM MODAL */}
       {selectedPhotoModal && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 text-white rounded-3xl max-w-lg w-full p-5 border border-white/10 space-y-4">
@@ -1065,7 +997,7 @@ export const CameraAttendanceView: React.FC = () => {
         }}
       />
 
-      {/* Hidden canvas element for photo processing */}
+      {/* Hidden Canvas */}
       <canvas ref={canvasRef} className="hidden" />
     </div>
   );
